@@ -5,6 +5,7 @@ project (Lot49)
 set (Lot49_VERSION_MAJOR 0)
 set (Lot49_VERSION_MINOR 1)
 set (CMAKE_CXX_STANDARD 11)
+set (CMAKE_BUILD_TYPE "DEBUG")
 
 include_directories(
   ${INCLUDE_DIRECTORIES}
@@ -15,7 +16,7 @@ include_directories(
   )
 
 add_library(bls STATIC IMPORTED)
-set_target_properties(bls PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/bls-signatures/build/libbls.a)
+set_target_properties(bls PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/bls-signatures/libbls.a)
 
 add_executable(lot49 lot49.cpp)
 target_link_libraries(lot49 bls)

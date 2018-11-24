@@ -1,9 +1,39 @@
 
 #include "bls.hpp"
+#include "MeshNode.hpp"
 
 using namespace std;
+using namespace lot49;
+
+// TODO: use  32 byte signatures, not 48 byte: https://twitter.com/sorgente711/status/1025451092610433024
 
 int main(int argc, char* argv[]) 
+{
+    // testBLS();
+    
+    // topology: A <> B <> C
+    MeshNode& nodeA = MeshNode::FromIndex(0);
+    MeshNode& nodeB = MeshNode::FromIndex(1);
+    MeshNode& nodeC = MeshNode::FromIndex(2);
+
+    MeshRoute theRouteBC = {nodeB.GetHGID(), nodeC.GetHGID()};
+    nodeA.AddRoute(theRouteBC);
+    nodeA.AddNeighbor(nodeB.GetHGID());
+
+    MeshRoute theRouteBA = {nodeB.GetHGID(), nodeA.GetHGID()};
+    nodeC.AddRoute(theRouteBA);
+    nodeC.AddNeighbor(nodeB.GetHGID());
+
+    MeshRoute theRouteBA = {nodeB.GetHGID(), nodeA.GetHGID()};
+    nodeB.AddNeighbor(nodeB.GetHGID());
+    nodeB.AddNeighbor(nodeA.GetHGID());
+
+    // send a message from A to C, and receive delivery receipt
+    bool isDelivered = nodeA.OriginateMessage(nodeC.GetHGID(), "Watson, come here.");
+
+};
+
+void testBLS()
 {
     cout << "start." << endl;
     //
@@ -19,21 +49,25 @@ int main(int argc, char* argv[])
     bls::PrivateKey sk = bls::PrivateKey::FromSeed(seed, sizeof(seed));
     bls::PublicKey pk = sk.GetPublicKey();
 
-    uint8_t msg[] = {100, 2, 254, 88, 90, 45, 23};
-
-    bls::Signature sig = sk.Sign(msg, sizeof(msg));
-
     //
     // Serializing keys and signatures to bytes
     //
 
     uint8_t skBytes[bls::PrivateKey::PRIVATE_KEY_SIZE]; // 32 byte array
-    uint8_t pkBytes[bls::PublicKey::PUBLIC_KEY_SIZE];   // 48 byte array
-    uint8_t sigBytes[bls::Signature::SIGNATURE_SIZE];   // 96 byte array
+    uint8_t pkBytes[bls::PublicKey::PUBLIC_KEY_SIZE];   // 96 byte array
+    uint8_t sigBytes[bls::Signature::SIGNATURE_SIZE];   // 48 byte array
 
-    sk.Serialize(skBytes);   // 32 bytes
-    pk.Serialize(pkBytes);   // 48 bytes
-    sig.Serialize(sigBytes); // 96 bytes
+    pk.Serialize(pkBytes); // 96 bytes
+
+    // Takes array of 96 bytes
+    pk = bls::PublicKey::FromBytes(pkBytes);
+
+    sk.Serialize(skBytes); // 32 bytes
+
+    uint8_t msg[] = {100, 2, 254, 88, 90, 45, 23};
+    bls::Signature sig = sk.Sign(msg, sizeof(msg));
+
+    sig.Serialize(sigBytes); // 48 bytes
 
     //
     // Loading keys and signatures from bytes
@@ -42,10 +76,10 @@ int main(int argc, char* argv[])
     // Takes array of 32 bytes
     sk = bls::PrivateKey::FromBytes(skBytes);
 
-    // Takes array of 48 bytes
+    // Takes array of 96 bytes
     pk = bls::PublicKey::FromBytes(pkBytes);
 
-    // Takes array of 96 bytes
+    // Takes array of 48 bytes
     sig = bls::Signature::FromBytes(sigBytes);
 
     //
@@ -100,7 +134,7 @@ int main(int argc, char* argv[])
     seed[0] = 2;
     bls::PrivateKey sk2 = bls::PrivateKey::FromSeed(seed, sizeof(seed));
     bls::PublicKey pk2 = sk2.GetPublicKey();
- 
+
     seed[0] = 3;
     bls::PrivateKey sk3 = bls::PrivateKey::FromSeed(seed, sizeof(seed));
     bls::PublicKey pk3 = sk3.GetPublicKey();
