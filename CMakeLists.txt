@@ -18,5 +18,5 @@ include_directories(
 add_library(bls STATIC IMPORTED)
 set_target_properties(bls PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/bls-signatures/libbls.a)
 
-add_executable(lot49 lot49.cpp)
+add_executable(lot49 lot49.cpp MeshNode.cpp ImpliedTransaction.cpp)
 target_link_libraries(lot49 bls)

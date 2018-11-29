@@ -1,4 +1,3 @@
-
 #include "bls.hpp"
 #include "MeshNode.hpp"
 
@@ -7,30 +6,58 @@ using namespace lot49;
 
 // TODO: use  32 byte signatures, not 48 byte: https://twitter.com/sorgente711/status/1025451092610433024
 
+void testBLS();
+
+std::ostream &operator<<(std::ostream &out, const MeshNode &n)
+{
+    out << "HGID: " << n.GetHGID() << " Public Key: ";
+    out << n.GetPublicKey();
+}
+
 int main(int argc, char* argv[]) 
 {
-    // testBLS();
-    
-    // topology: A <> B <> C
+    cout << "testBLS()" << endl;
+    testBLS();
+    cout << endl;
+  
+    // create nodes for topology: A <-> B <-> C
+    MeshNode::CreateNodes(3);
     MeshNode& nodeA = MeshNode::FromIndex(0);
-    MeshNode& nodeB = MeshNode::FromIndex(1);
-    MeshNode& nodeC = MeshNode::FromIndex(2);
+    cout << "Node A " << nodeA << endl;
 
-    MeshRoute theRouteBC = {nodeB.GetHGID(), nodeC.GetHGID()};
-    nodeA.AddRoute(theRouteBC);
+    MeshNode& nodeB = MeshNode::FromIndex(1);
+    cout << "Node B " << nodeB << endl;
+
+    MeshNode& nodeC = MeshNode::FromIndex(2);
+    cout << "Node C " << nodeC << endl;
+
+    // add neighbor A:B 
+    cout <<  endl << "add neighbor A:B !" << endl << endl;   
     nodeA.AddNeighbor(nodeB.GetHGID());
 
-    MeshRoute theRouteBA = {nodeB.GetHGID(), nodeA.GetHGID()};
-    nodeC.AddRoute(theRouteBA);
+
+    // add neighbor C:B
+    cout <<  endl << "add neighbor C:B !" << endl << endl;   
     nodeC.AddNeighbor(nodeB.GetHGID());
 
-    MeshRoute theRouteBA = {nodeB.GetHGID(), nodeA.GetHGID()};
-    nodeB.AddNeighbor(nodeB.GetHGID());
+    // add neighbor B:A and B:C
+    cout <<  endl << "add neighbor B:A and B:C !" << endl << endl;   
     nodeB.AddNeighbor(nodeA.GetHGID());
+    nodeB.AddNeighbor(nodeC.GetHGID());
+
+    // add route A->B->C
+    cout <<  endl << "add route A->B->C !" << endl << endl; 
+    MeshRoute theRouteBC = {nodeB.GetHGID(), nodeC.GetHGID()};
+    nodeA.AddRoute(theRouteBC);
+
+    // add route C->B->A
+    cout <<  endl << "add route C->B->A !" << endl << endl; 
+    MeshRoute theRouteBA = {nodeB.GetHGID(), nodeA.GetHGID()};
+    nodeC.AddRoute(theRouteBA);
 
     // send a message from A to C, and receive delivery receipt
-    bool isDelivered = nodeA.OriginateMessage(nodeC.GetHGID(), "Watson, come here.");
-
+    cout <<  endl << "send a message from A to C, and receive delivery receipt !" << endl << endl; 
+    bool isDelivered = nodeA.OriginateMessage(nodeC.GetHGID(), "Mr. Watson - come here - I want to see you.");
 };
 
 void testBLS()

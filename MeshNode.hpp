@@ -45,21 +45,6 @@ struct PeerChannel
     bool mConfirmed; // setup tx confirmed
 };
 
-enum EEventType
-{
-    eOriginate,
-    eTransmit,
-    eReceive
-};
-
-struct MessageEvent
-{
-    EEventType mEvent;
-    MeshMessage mMessage;
-    uint32_t mTimestamp;
-    uint16_t mNonce; // recreate payment address using mMessage.mSenderHGID + mMessage.mReceiverHGID + mNonce
-};
-
 static const uint8_t MAXRELAYS = 8;
 
 struct L49Header
@@ -86,16 +71,32 @@ struct MeshMessage
     std::string mPayloadData;
 };
 
+enum EEventType
+{
+    eOriginate,
+    eTransmit,
+    eReceive
+};
+
+struct MessageEvent
+{
+    EEventType mEvent;
+    MeshMessage mMessage;
+    uint32_t mTimestamp;
+    uint16_t mNonce; // recreate payment address using mMessage.mSenderHGID + mMessage.mReceiverHGID + mNonce
+};
+
 class MeshNode
 {
   public:
-    // Lookup or construct a node from a Hashed GID
-    static MeshNode &FromHGID(const HGID &inHGID);
-
-    static MeshNode &FromIndex(const size_t inIndex);
 
     // create mesh nodes
-    static void CreateNodes(const size_t inCount);
+    static void CreateNodes(const int inCount);
+
+    static MeshNode &FromIndex(const int inIndex);
+
+    // Lookup or construct a node from a Hashed GID
+    static MeshNode &FromHGID(const HGID &inHGID);
 
     HGID GetHGID() const;
     HGID GetNextHop(HGID inDestination) const;
@@ -116,7 +117,6 @@ class MeshNode
 
   private:
     MeshNode();
-    virtual ~MeshNode();
 
     // get existing peer channel open with neighbor 
     PeerChannel& GetChannel(HGID inNeighbor);
@@ -124,8 +124,11 @@ class MeshNode
     // open a channel with neighbor node
     void ProposeChannel(HGID inNeighbor);
 
+    //
+    bls::Signature GetAggregateSignature(const MeshMessage& inMessage);
+
     // 
-    std::vector<ImpliedTransaction>& GetTransactions(const MeshMessage& inMessage, const PeerChannel& inChannel);
+    std::vector<ImpliedTransaction> GetTransactions(const MeshMessage& inMessage);
 
     // 
     void UpdateIncentiveHeader(MeshMessage& ioMessage);
