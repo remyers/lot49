@@ -21,6 +21,7 @@ void SetPublicKey(std::vector<uint8_t>& outPubkey, const bls::PublicKey& inSourc
 
 ImpliedTransaction ImpliedTransaction::Issue(const bls::PublicKey& inReceiver, const uint8_t inFundingAmount)
 {
+    // cout << "Make Issue Tx" << endl;
     // issue 1:1 stored value UTXO from no previous UTXO, equivalent to mining reward (ie. no input tx)
     ImpliedTransaction tx;
     tx.mType = eIssue;
@@ -32,6 +33,7 @@ ImpliedTransaction ImpliedTransaction::Issue(const bls::PublicKey& inReceiver, c
 
 ImpliedTransaction ImpliedTransaction::Transfer(const ImpliedTransaction& inInput, const bls::PublicKey& inSender, const bls::PublicKey& inReceiver, const uint8_t inFundingAmount)
 {
+    //cout << "Make Transfer Tx" << endl;
     // transfer value to 1:1 UTXO from previous 1:1 UTXO
     ImpliedTransaction tx;
     tx.mInputTxHash = inInput.GetTransactionHash();
@@ -52,7 +54,7 @@ ImpliedTransaction ImpliedTransaction::Transfer(const ImpliedTransaction& inInpu
 
 ImpliedTransaction ImpliedTransaction::Setup(const ImpliedTransaction& inInput, const bls::PublicKey& inSender, const bls::PublicKey& inReceiver, const uint8_t inFundingAmount)
 {
-    cout << "Make Setup Tx" << endl;
+    //cout << "Make Setup Tx" << endl;
 // fund 2:2 UTXO from previous 1:1 UTXO
     ImpliedTransaction tx(inInput);
     tx.mInputTxHash = inInput.GetTransactionHash();
@@ -73,7 +75,7 @@ ImpliedTransaction ImpliedTransaction::Setup(const ImpliedTransaction& inInput, 
 
 ImpliedTransaction ImpliedTransaction::Refund(const ImpliedTransaction& inInput, const bls::PublicKey& inSender, const bls::PublicKey& inReceiver, const uint8_t inRefundAmount)
 {
-    cout << "Make Refund Tx" << endl;
+    //cout << "Make Refund Tx" << endl;
     // refund to 1:1 UTXO from previous 2:2 UTXO after delay
     ImpliedTransaction tx;
     tx.mInputTxHash = inInput.GetTransactionHash();
@@ -95,7 +97,7 @@ ImpliedTransaction ImpliedTransaction::Refund(const ImpliedTransaction& inInput,
 ImpliedTransaction ImpliedTransaction::UpdateAndSettle(const ImpliedTransaction& inInput, const bls::PublicKey& inSender, const bls::PublicKey& inReceiver, 
     const uint8_t inSenderAmount, const uint8_t inReceiverAmount, const bls::PublicKey& inDestination, const std::vector<uint8_t>& inMessageHash)
 {
-    cout << "Make UpdateAndSettle Tx" << endl;
+    //cout << "Make UpdateAndSettle Tx" << endl;
     // update to new 2:2 UTXO or settle to two 1:1 UTXOs after delay from previous 2:2 UTXO
     ImpliedTransaction tx;
     tx.mInputTxHash = inInput.GetTransactionHash();
@@ -117,7 +119,7 @@ ImpliedTransaction ImpliedTransaction::UpdateAndSettle(const ImpliedTransaction&
 ImpliedTransaction ImpliedTransaction::Close(const ImpliedTransaction& inInput, const bls::PublicKey& inSender, const bls::PublicKey& inReceiver, 
     const uint8_t inSenderAmount, const uint8_t inReceiverAmount)
 {
-    cout << "Make Close Tx" << endl;
+    //cout << "Make Close Tx" << endl;
     // refund Refund 2:2 UTXO
     ImpliedTransaction tx;
     tx.mInputTxHash = inInput.GetTransactionHash();

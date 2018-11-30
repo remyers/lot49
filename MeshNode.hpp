@@ -42,6 +42,9 @@ struct PeerChannel
     uint8_t mSpentTokens;
     uint16_t mLastNonce; // used to create unique shared 2-of-2 address
     EChannelState mState; // Setup1 -> Setup2 -> Negotiate1 -> Negotiate2 -> Receipt1 -> Receipt2 -> (Close1 -> Close2) or (back to Negotiate1)
+    std::vector<uint8_t> mRefundSignature; // bls::Signature::SIGNATURE_SIZE
+    std::vector<uint8_t> mPayloadHash; // bls::BLS::MESSAGE_HASH_LEN, hash of last payload - used for return receipt
+
     bool mConfirmed; // setup tx confirmed
 };
 
@@ -95,37 +98,43 @@ class MeshNode
 
     static MeshNode &FromIndex(const int inIndex);
 
+    // configure topology
+    static void AddRoute(MeshRoute inRoute);
+    
+    static bool HasNeighbor(HGID inNode, HGID inNeighbor);
+
     // Lookup or construct a node from a Hashed GID
     static MeshNode &FromHGID(const HGID &inHGID);
 
+    static HGID GetNextHop(HGID inNode, HGID inDestination);
+
     HGID GetHGID() const;
-    HGID GetNextHop(HGID inDestination) const;
+
+    // access private key
+    const bls::PrivateKey GetPrivateKey() const;
 
     // access public key
     const bls::PublicKey GetPublicKey() const;
 
-    // configure topology
-    void AddRoute(MeshRoute inRoute);
-    
-    bool HasNeighbor(HGID inNeighbor) const;
-
-    // propose channel to new neighbor
-    void AddNeighbor(HGID inNeighbor);
+    // open a channel with neighbor node
+    void ProposeChannel(HGID inNeighbor);
 
     // originate new message
-    bool OriginateMessage(const HGID inDestination, const std::string &inPayload);
+    void OriginateMessage(const HGID inDestination, const std::string &inPayload);
+
+    friend std::ostream &operator<<(std::ostream &out, const MeshNode &n);
 
   private:
     MeshNode();
 
+    // return true if channel exists with this neighbor
+    bool HasChannel(HGID inNeighbor) const;
+
     // get existing peer channel open with neighbor 
     PeerChannel& GetChannel(HGID inNeighbor);
 
-    // open a channel with neighbor node
-    void ProposeChannel(HGID inNeighbor);
-
     //
-    bls::Signature GetAggregateSignature(const MeshMessage& inMessage);
+    bls::Signature GetAggregateSignature(const MeshMessage& inMessage, const bool isUpdatingSignature);
 
     // 
     std::vector<ImpliedTransaction> GetTransactions(const MeshMessage& inMessage);
@@ -157,14 +166,18 @@ class MeshNode
     // receive message
     bool ReceiveMessage(const MeshMessage& inMessage);
 
+    // receive delivery receipt
+    bool RelayDeliveryReceipt(const MeshMessage& inMessage);
+
     static vector<MeshNode> sNodes;
+
+    // routes computed by routing protocol
+    static std::list<MeshRoute> sRoutes;
 
     std::list<MessageEvent> mMessageEvents;
     std::list<PeerChannel> mPeerChannels;
 
-    // routes computed by routing protocol
-    std::list<MeshRoute> mRoutes;
-
+    // used to create private key
     std::vector<uint8_t> mSeed;
 };
 

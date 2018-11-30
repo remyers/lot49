@@ -1,68 +1,43 @@
 #include "bls.hpp"
 #include "MeshNode.hpp"
+#include <algorithm>
 
 using namespace std;
 using namespace lot49;
 
 // TODO: use  32 byte signatures, not 48 byte: https://twitter.com/sorgente711/status/1025451092610433024
 
-void testBLS();
-
-std::ostream &operator<<(std::ostream &out, const MeshNode &n)
-{
-    out << "HGID: " << n.GetHGID() << " Public Key: ";
-    out << n.GetPublicKey();
-}
+bool testBLS();
 
 int main(int argc, char* argv[]) 
 {
-    cout << "testBLS()" << endl;
-    testBLS();
-    cout << endl;
+    cout << "testBLS():  " << (testBLS() ? "success!" : "failed!") << endl;
   
-    // create nodes for topology: A <-> B <-> C
-    MeshNode::CreateNodes(3);
-    MeshNode& nodeA = MeshNode::FromIndex(0);
-    cout << "Node A " << nodeA << endl;
+    const size_t MAX_NODES = 4; 
+    MeshNode::CreateNodes(MAX_NODES);
+ 
+    // create linear route: A <-> B <-> C .. etc
+    MeshRoute route;
+    for (int i = 0; i < MAX_NODES; i++) {
+        HGID hgid = MeshNode::FromIndex(i).GetHGID();
+        route.push_back(hgid);
+    }
 
-    MeshNode& nodeB = MeshNode::FromIndex(1);
-    cout << "Node B " << nodeB << endl;
-
-    MeshNode& nodeC = MeshNode::FromIndex(2);
-    cout << "Node C " << nodeC << endl;
-
-    // add neighbor A:B 
-    cout <<  endl << "add neighbor A:B !" << endl << endl;   
-    nodeA.AddNeighbor(nodeB.GetHGID());
-
-
-    // add neighbor C:B
-    cout <<  endl << "add neighbor C:B !" << endl << endl;   
-    nodeC.AddNeighbor(nodeB.GetHGID());
-
-    // add neighbor B:A and B:C
-    cout <<  endl << "add neighbor B:A and B:C !" << endl << endl;   
-    nodeB.AddNeighbor(nodeA.GetHGID());
-    nodeB.AddNeighbor(nodeC.GetHGID());
-
-    // add route A->B->C
-    cout <<  endl << "add route A->B->C !" << endl << endl; 
-    MeshRoute theRouteBC = {nodeB.GetHGID(), nodeC.GetHGID()};
-    nodeA.AddRoute(theRouteBC);
-
-    // add route C->B->A
-    cout <<  endl << "add route C->B->A !" << endl << endl; 
-    MeshRoute theRouteBA = {nodeB.GetHGID(), nodeA.GetHGID()};
-    nodeC.AddRoute(theRouteBA);
+    // add route from first to last node
+    MeshNode::AddRoute(route);
 
     // send a message from A to C, and receive delivery receipt
-    cout <<  endl << "send a message from A to C, and receive delivery receipt !" << endl << endl; 
-    bool isDelivered = nodeA.OriginateMessage(nodeC.GetHGID(), "Mr. Watson - come here - I want to see you.");
+    std::string payload = "Mr. Watson - come here - I want to see you.";
+    cout <<  endl << "Node " << MeshNode::FromIndex(0).GetHGID() << ": send a message to Node " << MeshNode::FromIndex(MAX_NODES-1).GetHGID() <<", and receive delivery receipt" << endl << endl; 
+    MeshNode::FromIndex(0).OriginateMessage(MeshNode::FromIndex(MAX_NODES-1).GetHGID(), payload);
+
+    payload = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks.";
+    cout <<  endl << "Node " << MeshNode::FromIndex(0).GetHGID() << ": send a message to Node " << MeshNode::FromIndex(MAX_NODES-1).GetHGID() <<", and receive delivery receipt" << endl << endl; 
+    MeshNode::FromIndex(0).OriginateMessage(MeshNode::FromIndex(MAX_NODES-1).GetHGID(), payload);
 };
 
-void testBLS()
+bool testBLS()
 {
-    cout << "start." << endl;
     //
     // Creating keys and signatures
     //
@@ -213,5 +188,6 @@ void testBLS()
 
     // Final verification is now more efficient
     ok = aggSigFinal.Verify();
-    cout << "done." << endl;
+
+    return ok;
 }
