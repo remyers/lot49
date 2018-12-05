@@ -27,3 +27,5 @@ src/*.o
 *.pb.h
 
 **/.DS_Store
+lot49
+lot49.log
