@@ -167,19 +167,19 @@ class MeshNode
     bool VerifyMessage(const MeshMessage &inMessage);
 
     // relay a message
-    bool RelayMessage(const MeshMessage& inMessage);
+    void RelayMessage(const MeshMessage& inMessage);
 
     // fund a channel
-    bool FundChannel(const MeshMessage& inMessage);
+    void FundChannel(const MeshMessage& inMessage);
 
     // receive message
-    bool ReceiveMessage(const MeshMessage& inMessage);
+    void ReceiveMessage(const MeshMessage& inMessage);
 
     // relay delivery receipt
-    bool RelayDeliveryReceipt(const MeshMessage& inMessage);
+    void RelayDeliveryReceipt(const MeshMessage& inMessage);
 
     // verify the setup transaction for a payment channel with a witness node (via inGateway)
-    bool VerifySetupTransaction(const MeshMessage& inMessage, const HGID inGateway);
+    void ConfirmSetupTransaction(const MeshMessage& inMessage, const HGID inGateway);
 
     // compute serialization of the Mesh Message for Witness verification
     std::vector<uint8_t> Serialize() const;

@@ -11,8 +11,8 @@ bool testBLS();
 
 void TestRoute(HGID inSender, HGID inReceiver, std::string& inMessage)
 {
-    // send a message from reverse of route 1 [D2 to A], and receive delivery receipt
-    cout << std::hex << endl << "Node " << std::setw(4) << std::setfill('0') << inSender << ": send a message to Node " << std::setw(4) << inReceiver <<", and receive delivery receipt" << endl; 
+    // send a message and receive delivery receipt
+    cout << std::hex << endl << "Node " << std::setw(4) << std::setfill('0') << inSender << ": send a message to Node " << std::setw(4) << inReceiver << endl; 
     MeshNode::FromHGID(inSender).OriginateMessage(inReceiver, std::vector<uint8_t>(inMessage.begin(), inMessage.end()));
 }
 
@@ -45,9 +45,9 @@ int main(int argc, char* argv[])
 
     cout << "----------------------------------------------" << endl << endl;
 
-    // send a message from route 0 [B to D2], and receive delivery receipt
+    // send a message from route 0 [A to C], and receive delivery receipt
     std::string payload = "TEST TEST TEST";
-    TestRoute(route1[1], route2.back(), payload);
+    TestRoute(route1[0], route1[2], payload);
 
     cout << "----------------------------------------------" << endl << endl;
 
