@@ -72,6 +72,7 @@ std::ostream &operator<<(std::ostream &out, const std::vector<HGID> &v) {
     for (auto hgid : v) {
         out << std::setw(2) << std::setfill('0') << static_cast<int>(hgid);
     }
+    return out;
 }
 
 std::ostream &operator<<(std::ostream &out, const MeshNode &n)
@@ -81,8 +82,9 @@ std::ostream &operator<<(std::ostream &out, const MeshNode &n)
     out << "\tSeed: ";
     out << std::hex;
     for (auto byte : n.mSeed ) {
-        out << std::setw(2) << std::setfill('0') << static_cast<int>(byte);
+        out << std::setw(2) << std::setfill('0') << (int)(byte);
     } 
+    return out;
 }
 
 std::ostream& operator<<(std::ostream &out, const L49Header &i)
@@ -102,6 +104,7 @@ std::ostream& operator<<(std::ostream &out, const L49Header &i)
     } 
     out << endl;
     */
+   return out;
 }
 
 std::ostream &operator<<(std::ostream &out, const MeshMessage &m)
@@ -123,6 +126,7 @@ std::ostream &operator<<(std::ostream &out, const MeshMessage &m)
         out << " Payload: [" << payload_text << "]" << endl;
     }
     out << "\t" << m.mIncentive;
+    return out;
 }
 
 // create mesh nodes
@@ -133,8 +137,8 @@ void MeshNode::CreateNodes(const int inCount)
     //std::generate(sNodes.begin(), sNodes.end(), [&] {return MeshNode();});
 
     for (auto n: sNodes) {
-        _log << n;
-        _log << endl;
+        cout << n;
+        cout << endl;
     }
 }
 
