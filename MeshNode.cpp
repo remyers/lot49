@@ -82,7 +82,7 @@ std::ostream &operator<<(std::ostream &out, const MeshNode &n)
     out << "\tSeed: ";
     out << std::hex;
     for (auto byte : n.mSeed ) {
-        out << std::setw(2) << std::setfill('0') << (int)(byte);
+        out << std::setw(2) << std::setfill('0') << static_cast<int>(byte);
     } 
     return out;
 }
@@ -137,8 +137,8 @@ void MeshNode::CreateNodes(const int inCount)
     //std::generate(sNodes.begin(), sNodes.end(), [&] {return MeshNode();});
 
     for (auto n: sNodes) {
-        cout << n;
-        cout << endl;
+        _log << n;
+        _log << endl;
     }
 }
 
