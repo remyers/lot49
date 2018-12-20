@@ -1,5 +1,3 @@
-using namespace std;
-
 #include "bls.hpp"
 #include "ImpliedTransaction.hpp"
 
@@ -16,6 +14,18 @@ typedef uint16_t HGID;
 
 // Mesh route
 typedef std::vector<HGID> MeshRoute;
+
+//
+// simulation parameters
+//
+
+static double sMaxSize = 5000; // meters width
+static double sMoveRate = 85; // meters per minute
+static int sDurationTime = 60; // minutes of simulation
+static int sPauseTime = 20; // minutes of simulation
+static int sCurrentTime = 0; // minutes of simulation
+static int sPayloadSize = 50; // bytes
+static int sRadioRange = 800; // radio communication range
 
 //
 // incentive headers
@@ -107,11 +117,15 @@ class MeshNode
     // Lookup a node from a public key
     static MeshNode &FromPublicKey(const bls::PublicKey& inPk);
 
+    static void ClearRoutes();
+
     static HGID GetNextHop(HGID infromNode, HGID inDestination);
 
     static void AddGateway(HGID inNode);
 
     static HGID GetNearestGateway(HGID inFromNode);
+
+    static void UpdateSimulation();
 
     MeshNode();
 
@@ -130,11 +144,17 @@ class MeshNode
     void OriginateMessage(const HGID inDestination, const std::vector<uint8_t> &inPayload);
 
     // set witness node
-    void SetWitnessNode(const HGID inWitness);
+    void SetWitnessNode(const HGID inHGID);
+
+    // set witness node
+    void SetCorrespondentNode(const HGID inHGID);
 
     friend std::ostream &operator<<(std::ostream &out, const MeshNode &n);
 
   private:
+
+    // recursively find shortest route to a node
+    MeshRoute FindRoute(const HGID inDestination, double& ioDistance);
 
     // return true if channel exists with this neighbor
     bool HasChannel(HGID inNeighbor) const;
@@ -199,6 +219,12 @@ class MeshNode
 
     // used to create private key
     std::vector<uint8_t> mSeed;
+
+    // coordinates
+    std::pair<double, double> mCurrentPos; // meters from origin
+    std::pair<double, double> mWaypoint; // meters from origin
+    HGID mCorrespondent;
+    int mPausedUntil; // simulation minutes
 };
 
 }; // namespace lot49

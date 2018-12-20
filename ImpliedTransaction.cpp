@@ -161,7 +161,7 @@ ImpliedTransaction::ImpliedTransaction()
 std::vector<uint8_t> ImpliedTransaction::GetTransactionHash() const
 {
     const std::vector<uint8_t> msg = Serialize();
-    vector<uint8_t> message_hash(bls::BLS::MESSAGE_HASH_LEN);
+    std::vector<uint8_t> message_hash(bls::BLS::MESSAGE_HASH_LEN);
     bls::Util::Hash256(&message_hash[0], reinterpret_cast<const uint8_t*>(msg.data()), msg.size());
     return message_hash;
 }

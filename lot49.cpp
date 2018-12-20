@@ -13,7 +13,9 @@ void TestRoute(HGID inSender, HGID inReceiver, std::string& inMessage)
 {
     // send a message and receive delivery receipt
     cout << std::hex << endl << "Node " << std::setw(4) << std::setfill('0') << inSender << ": send a message to Node " << std::setw(4) << inReceiver << endl; 
-    MeshNode::FromHGID(inSender).OriginateMessage(inReceiver, std::vector<uint8_t>(inMessage.begin(), inMessage.end()));
+    std::vector<uint8_t> data(inMessage.begin(), inMessage.end());
+    assert(data.size() == inMessage.size());
+    MeshNode::FromHGID(inSender).OriginateMessage(inReceiver, data);
 }
 
 int main(int argc, char* argv[]) 
@@ -22,17 +24,32 @@ int main(int argc, char* argv[])
   
     const size_t MAX_NODES = 5; 
     MeshNode::CreateNodes(MAX_NODES);
- 
+
     // create linear route: A <-> B <-> C .. etc
+    for (int i = 0; i < MAX_NODES-1; i++) {
+        // nodes correspond with next node in list at a random position
+        MeshNode::FromIndex(i).SetCorrespondentNode(MeshNode::FromIndex(i % MAX_NODES).GetHGID());
+    }
+
+ 
+    // create linear route: A <-> B <-> C <-> D1
     MeshRoute route1;
     for (int i = 0; i < MAX_NODES-1; i++) {
         HGID hgid = MeshNode::FromIndex(i).GetHGID();
         route1.push_back(hgid);
     }
+    HGID A = route1.front();
+    HGID C = route1[2];
+    HGID D1 = route1.back();
     MeshRoute route2 = route1;
     route2.pop_back();
-    HGID hgid = MeshNode::FromIndex(MAX_NODES-1).GetHGID();
-    route2.push_back(hgid);
+    HGID D2 = MeshNode::FromIndex(MAX_NODES-1).GetHGID();
+    route2.push_back(D2);
+
+    // add route to gateway
+    HGID gateway = MeshNode::FromIndex(MAX_NODES).GetHGID();
+    route1.push_back(gateway);
+    route2.push_back(gateway);
 
     // add route from first to D1 node A->B->C->D1
     MeshNode::AddRoute(route1);
@@ -41,31 +58,31 @@ int main(int argc, char* argv[])
     MeshNode::AddRoute(route2);
 
     // set the last node as a gateway for verifying setup transactions
-    MeshNode::AddGateway(route2.back());
+    MeshNode::AddGateway(MeshNode::FromIndex(MAX_NODES).GetHGID());
 
     cout << "----------------------------------------------" << endl << endl;
 
     // send a message from route 0 [A to C], and receive delivery receipt
     std::string payload = "TEST TEST TEST";
-    TestRoute(route1[0], route1[2], payload);
+    TestRoute(A, C, payload);
 
     cout << "----------------------------------------------" << endl << endl;
 
     // send a message from route 1 [A to D1], and receive delivery receipt
     payload = "Mr. Watson - come here - I want to see you.";
-    TestRoute(route1.front(), route1.back(), payload);
-
+    TestRoute(A, D1, payload);
     cout << "----------------------------------------------" << endl << endl;
+
 
     // send a message from route 2 [A to D2], and receive delivery receipt
     payload = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks.";
-    TestRoute(route2.front(), route2.back(), payload);
+    TestRoute(A, D2, payload);
 
     cout << "----------------------------------------------" << endl << endl;
 
     // send a message from reverse of route 1 [D2 to A], and receive delivery receipt
     payload = "The computer can be used as a tool to liberate and protect people, rather than to control them.";
-    TestRoute(route2.back(), route2.front(), payload);
+    TestRoute(D2, A, payload);
 };
 
 bool testBLS()
