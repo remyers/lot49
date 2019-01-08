@@ -21,14 +21,14 @@ class ImpliedTransaction {
 public:
 
 // create implied transactions
-static ImpliedTransaction Issue(const bls::PublicKey& inReceiver, const uint8_t inFundingAmount);
-static ImpliedTransaction Transfer(const ImpliedTransaction& inInput, const bls::PublicKey& inSource, const bls::PublicKey& inReceiver, const uint8_t inFundingAmount);
-static ImpliedTransaction Setup(const ImpliedTransaction& inInput, const bls::PublicKey& inSource, const bls::PublicKey& inReceiver, const uint8_t inFundingAmount);
-static ImpliedTransaction Refund(const ImpliedTransaction& inInput, const bls::PublicKey& inSource, const bls::PublicKey& inReceiver, const bls::PublicKey& inSigner, const uint8_t inRefundAmount);
+static ImpliedTransaction Issue(const bls::PublicKey& inReceiver, const uint16_t inFundingAmount);
+static ImpliedTransaction Transfer(const ImpliedTransaction& inInput, const bls::PublicKey& inSource, const bls::PublicKey& inReceiver, const uint16_t inFundingAmount);
+static ImpliedTransaction Setup(const ImpliedTransaction& inInput, const bls::PublicKey& inSource, const bls::PublicKey& inReceiver, const uint16_t inFundingAmount);
+static ImpliedTransaction Refund(const ImpliedTransaction& inInput, const bls::PublicKey& inSource, const bls::PublicKey& inReceiver, const bls::PublicKey& inSigner, const uint16_t inRefundAmount);
 static ImpliedTransaction UpdateAndSettle(const ImpliedTransaction& inInput, const bls::PublicKey& inSender, const bls::PublicKey& inReceiver, const bls::PublicKey& inSigner, 
-    const uint8_t inSenderAmount, const uint8_t inReceiverAmount, const bls::PublicKey& inDestination, const std::vector<uint8_t>& inMessageHash);
+    const uint16_t inSenderAmount, const uint16_t inReceiverAmount, const bls::PublicKey& inDestination, const std::vector<uint8_t>& inMessageHash);
 static ImpliedTransaction Close(const ImpliedTransaction& inInput, const bls::PublicKey& inSender, const bls::PublicKey& inReceiver, const bls::PublicKey& inSigner, 
-    const uint8_t inSenderAmount, const uint8_t inReceiverAmount);
+    const uint16_t inSenderAmount, const uint16_t inReceiverAmount);
 
 // compute transaction hash
 std::vector<uint8_t> GetTransactionHash() const;
@@ -53,8 +53,8 @@ std::vector<uint8_t> mInputOwner1;
 std::vector<uint8_t> mInputOwner2;
 std::vector<uint8_t> mOutputOwner1;
 std::vector<uint8_t> mOutputOwner2;
-uint8_t mOutputAmount1;
-uint8_t mOutputAmount2;
+uint16_t mOutputAmount1;
+uint16_t mOutputAmount2;
 uint8_t mTimeDelay;
 uint8_t mChannelState;
 std::vector<uint8_t> mMessageSigner;

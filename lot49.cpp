@@ -9,6 +9,9 @@ using namespace lot49;
 
 bool testBLS();
 
+void test1();
+void test2();
+
 void TestRoute(HGID inSender, HGID inReceiver, std::string& inMessage)
 {
     // send a message and receive delivery receipt
@@ -21,17 +24,31 @@ void TestRoute(HGID inSender, HGID inReceiver, std::string& inMessage)
 int main(int argc, char* argv[]) 
 {
     cout << "testBLS():  " << (testBLS() ? "success!" : "failed!") << endl;
-  
-    const size_t MAX_NODES = 5; 
+
+    // test with pre-defined paths
+    // test1();
+
+    // test randomly moving nodes
+    test2();
+};
+
+// test randomly moving nodes
+void test2()
+{
+   const size_t MAX_NODES = 25; 
     MeshNode::CreateNodes(MAX_NODES);
 
-    // create linear route: A <-> B <-> C .. etc
-    for (int i = 0; i < MAX_NODES-1; i++) {
-        // nodes correspond with next node in list at a random position
-        MeshNode::FromIndex(i).SetCorrespondentNode(MeshNode::FromIndex(i % MAX_NODES).GetHGID());
+    for (int i = 0; i < 120; i++) {
+        MeshNode::UpdateSimulation();
     }
+}
 
- 
+// test with pre-defined paths
+void test1()
+{
+    const size_t MAX_NODES = 6; 
+    MeshNode::CreateNodes(MAX_NODES);
+
     // create linear route: A <-> B <-> C <-> D1
     MeshRoute route1;
     for (int i = 0; i < MAX_NODES-1; i++) {
@@ -39,6 +56,7 @@ int main(int argc, char* argv[])
         route1.push_back(hgid);
     }
     HGID A = route1.front();
+    HGID B = route1[1];
     HGID C = route1[2];
     HGID D1 = route1.back();
     MeshRoute route2 = route1;
@@ -57,20 +75,18 @@ int main(int argc, char* argv[])
     // add route from first to D2 node A->B-C->D2
     MeshNode::AddRoute(route2);
 
-    // set the last node as a gateway for verifying setup transactions
-    MeshNode::AddGateway(MeshNode::FromIndex(MAX_NODES).GetHGID());
-
     cout << "----------------------------------------------" << endl << endl;
 
     // send a message from route 0 [A to C], and receive delivery receipt
     std::string payload = "TEST TEST TEST";
+    TestRoute(A, B, payload);
     TestRoute(A, C, payload);
 
     cout << "----------------------------------------------" << endl << endl;
 
     // send a message from route 1 [A to D1], and receive delivery receipt
-    payload = "Mr. Watson - come here - I want to see you.";
-    TestRoute(A, D1, payload);
+    //payload = "Mr. Watson - come here - I want to see you.";
+    //TestRoute(A, D1, payload);
     cout << "----------------------------------------------" << endl << endl;
 
 
@@ -81,9 +97,9 @@ int main(int argc, char* argv[])
     cout << "----------------------------------------------" << endl << endl;
 
     // send a message from reverse of route 1 [D2 to A], and receive delivery receipt
-    payload = "The computer can be used as a tool to liberate and protect people, rather than to control them.";
-    TestRoute(D2, A, payload);
-};
+    //payload = "The computer can be used as a tool to liberate and protect people, rather than to control them.";
+    //TestRoute(D2, A, payload);
+}
 
 bool testBLS()
 {

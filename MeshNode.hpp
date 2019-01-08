@@ -16,18 +16,6 @@ typedef uint16_t HGID;
 typedef std::vector<HGID> MeshRoute;
 
 //
-// simulation parameters
-//
-
-static double sMaxSize = 5000; // meters width
-static double sMoveRate = 85; // meters per minute
-static int sDurationTime = 60; // minutes of simulation
-static int sPauseTime = 20; // minutes of simulation
-static int sCurrentTime = 0; // minutes of simulation
-static int sPayloadSize = 50; // bytes
-static int sRadioRange = 800; // radio communication range
-
-//
 // incentive headers
 //
 
@@ -48,12 +36,13 @@ struct PeerChannel
 {
     HGID mFundingPeer;
     HGID mProposingPeer;
-    uint8_t mUnspentTokens;
-    uint8_t mSpentTokens;
+    uint16_t mUnspentTokens;
+    uint16_t mSpentTokens;
     uint16_t mLastNonce; // used to create unique shared 2-of-2 address
     EChannelState mState; // Setup1 -> Setup2 -> Negotiate1 -> Negotiate2 -> Receipt1 -> Receipt2 -> (Close1 -> Close2) or (back to Negotiate1)
     std::vector<uint8_t> mRefundSignature; // bls::Signature::SIGNATURE_SIZE
-    std::vector<uint8_t> mPayloadHash; // bls::BLS::MESSAGE_HASH_LEN, hash of last payload - used for return receipt
+    std::vector<uint8_t> mPayloadHash; // bls::BLS::MESSAGE_HASH_LEN, hash of last payload - used for return receipt of payload
+    std::vector<uint8_t> mWitnessHash; // bls::BLS::MESSAGE_HASH_LEN, hash of last witess - used for return receipt of witness
 
     bool mConfirmed; // setup tx confirmed    
 };
@@ -119,13 +108,17 @@ class MeshNode
 
     static void ClearRoutes();
 
-    static HGID GetNextHop(HGID infromNode, HGID inDestination);
+    static HGID GetNextHop(HGID inNode, HGID inDestination);
 
-    static void AddGateway(HGID inNode);
+    static bool GetNextHop(HGID inNode, HGID inDestination, HGID& outNextHop);
 
-    static HGID GetNearestGateway(HGID inFromNode);
+    static void AddGateway(HGID inNode);    
+
+    static void PrintTopology();
 
     static void UpdateSimulation();
+
+    static void WriteStats(const std::string& inLabel, const MeshMessage& inMessage);
 
     MeshNode();
 
@@ -141,26 +134,32 @@ class MeshNode
     void ProposeChannel(HGID inNeighbor);
 
     // originate new message
-    void OriginateMessage(const HGID inDestination, const std::vector<uint8_t> &inPayload);
+    bool OriginateMessage(const HGID inDestination, const std::vector<uint8_t> &inPayload);
 
     // set witness node
     void SetWitnessNode(const HGID inHGID);
 
-    // set witness node
+    // set/get correspondent node
     void SetCorrespondentNode(const HGID inHGID);
+    HGID GetCorrespondentNode() const;
+
+    // is gateway node?
+    bool GetIsGateway() const;
+
+    bool GetNearestGateway(HGID& outGatewayNode);
 
     friend std::ostream &operator<<(std::ostream &out, const MeshNode &n);
 
   private:
 
     // recursively find shortest route to a node
-    MeshRoute FindRoute(const HGID inDestination, double& ioDistance);
+    bool FindRoute(const HGID inDestination, MeshRoute& ioRoute, std::list<HGID>& ioVisited, double& ioDistance);
 
     // return true if channel exists with this neighbor
-    bool HasChannel(HGID inNeighbor) const;
+    bool HasChannel(HGID inProposer, HGID inFunder) const;
 
     // get existing peer channel open with neighbor 
-    PeerChannel& GetChannel(HGID inNeighbor);
+    PeerChannel& GetChannel(HGID inProposer, HGID inFunder);
 
     //
     bls::Signature GetAggregateSignature(const MeshMessage& inMessage, const bool isSigning);
@@ -199,7 +198,7 @@ class MeshNode
     void RelayDeliveryReceipt(const MeshMessage& inMessage);
 
     // verify the setup transaction for a payment channel with a witness node (via inGateway)
-    void ConfirmSetupTransaction(const MeshMessage& inMessage, const HGID inGateway);
+    bool ConfirmSetupTransaction(const MeshMessage& inMessage, const HGID inGateway);
 
     // compute serialization of the Mesh Message for Witness verification
     std::vector<uint8_t> Serialize() const;
@@ -209,16 +208,16 @@ class MeshNode
     // routes computed by routing protocol
     static std::list<MeshRoute> sRoutes;
 
-    // list of nodes that act as gateways to the internet/witness nodes
-    static std::list<HGID> sGateways;
-
     // state of the channel with a peer (receiving, next hop) node
-    std::list<PeerChannel> mPeerChannels;
+    std::map<std::pair<HGID,HGID>, PeerChannel> mPeerChannels;
 
     HGID mWitnessNode;
 
     // used to create private key
     std::vector<uint8_t> mSeed;
+
+    // gateway
+    bool mIsGateway;
 
     // coordinates
     std::pair<double, double> mCurrentPos; // meters from origin

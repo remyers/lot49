@@ -19,7 +19,7 @@ void SetPublicKey(std::vector<uint8_t>& outPubkey, const bls::PublicKey& inSourc
     inSource.Serialize(&outPubkey[0]);
 }
 
-ImpliedTransaction ImpliedTransaction::Issue(const bls::PublicKey& inReceiver, const uint8_t inFundingAmount)
+ImpliedTransaction ImpliedTransaction::Issue(const bls::PublicKey& inReceiver, const uint16_t inFundingAmount)
 {
     // cout << "Make Issue Tx" << endl;
     // issue 1:1 stored value UTXO from no previous UTXO, equivalent to mining reward (ie. no input tx)
@@ -31,7 +31,7 @@ ImpliedTransaction ImpliedTransaction::Issue(const bls::PublicKey& inReceiver, c
     return tx;
 }
 
-ImpliedTransaction ImpliedTransaction::Transfer(const ImpliedTransaction& inInput, const bls::PublicKey& inSender, const bls::PublicKey& inReceiver, const uint8_t inFundingAmount)
+ImpliedTransaction ImpliedTransaction::Transfer(const ImpliedTransaction& inInput, const bls::PublicKey& inSender, const bls::PublicKey& inReceiver, const uint16_t inFundingAmount)
 {
     //cout << "Make Transfer Tx" << endl;
     // transfer value to 1:1 UTXO from previous 1:1 UTXO
@@ -52,7 +52,7 @@ ImpliedTransaction ImpliedTransaction::Transfer(const ImpliedTransaction& inInpu
     return tx;
 }
 
-ImpliedTransaction ImpliedTransaction::Setup(const ImpliedTransaction& inInput, const bls::PublicKey& inSender, const bls::PublicKey& inReceiver, const uint8_t inFundingAmount)
+ImpliedTransaction ImpliedTransaction::Setup(const ImpliedTransaction& inInput, const bls::PublicKey& inSender, const bls::PublicKey& inReceiver, const uint16_t inFundingAmount)
 {
     //cout << "Make Setup Tx" << endl;
 // fund 2:2 UTXO from previous 1:1 UTXO
@@ -73,7 +73,7 @@ ImpliedTransaction ImpliedTransaction::Setup(const ImpliedTransaction& inInput, 
     return tx;
 }
 
-ImpliedTransaction ImpliedTransaction::Refund(const ImpliedTransaction& inInput, const bls::PublicKey& inSender, const bls::PublicKey& inReceiver, const bls::PublicKey& inSigner, const uint8_t inRefundAmount)
+ImpliedTransaction ImpliedTransaction::Refund(const ImpliedTransaction& inInput, const bls::PublicKey& inSender, const bls::PublicKey& inReceiver, const bls::PublicKey& inSigner, const uint16_t inRefundAmount)
 {
     //cout << "Make Refund Tx" << endl;
     // refund to 1:1 UTXO from previous 2:2 UTXO after delay
@@ -95,7 +95,7 @@ ImpliedTransaction ImpliedTransaction::Refund(const ImpliedTransaction& inInput,
 }
 
 ImpliedTransaction ImpliedTransaction::UpdateAndSettle(const ImpliedTransaction& inInput, const bls::PublicKey& inSender, const bls::PublicKey& inReceiver, const bls::PublicKey& inSigner, 
-    const uint8_t inSenderAmount, const uint8_t inReceiverAmount, const bls::PublicKey& inDestination, const std::vector<uint8_t>& inMessageHash)
+    const uint16_t inSenderAmount, const uint16_t inReceiverAmount, const bls::PublicKey& inDestination, const std::vector<uint8_t>& inMessageHash)
 {
     //cout << "Make UpdateAndSettle Tx" << endl;
     // update to new 2:2 UTXO or settle to two 1:1 UTXOs after delay from previous 2:2 UTXO
@@ -117,7 +117,7 @@ ImpliedTransaction ImpliedTransaction::UpdateAndSettle(const ImpliedTransaction&
 }
 
 ImpliedTransaction ImpliedTransaction::Close(const ImpliedTransaction& inInput, const bls::PublicKey& inSender, const bls::PublicKey& inReceiver, const bls::PublicKey& inSigner, 
-    const uint8_t inSenderAmount, const uint8_t inReceiverAmount)
+    const uint16_t inSenderAmount, const uint16_t inReceiverAmount)
 {
     //cout << "Make Close Tx" << endl;
     // refund Refund 2:2 UTXO
@@ -169,7 +169,7 @@ std::vector<uint8_t> ImpliedTransaction::GetTransactionHash() const
 // compute serialization of the transaction
 std::vector<uint8_t> ImpliedTransaction::Serialize() const
 {
-    std::vector<uint8_t> msg(bls::PublicKey::PUBLIC_KEY_SIZE*6 + bls::BLS::MESSAGE_HASH_LEN*2 + 5);
+    std::vector<uint8_t> msg(bls::PublicKey::PUBLIC_KEY_SIZE*6 + bls::BLS::MESSAGE_HASH_LEN*2 + 7);
     auto msg_ptr = msg.begin();
     msg_ptr = std::copy(mInputTxHash.begin(), mInputTxHash.end(), msg_ptr);
     *msg_ptr++ = static_cast<uint8_t>(mType);
@@ -177,8 +177,8 @@ std::vector<uint8_t> ImpliedTransaction::Serialize() const
     msg_ptr = std::copy(mInputOwner2.begin(), mInputOwner2.end(), msg_ptr);
     msg_ptr = std::copy(mOutputOwner1.begin(), mOutputOwner1.end(), msg_ptr);
     msg_ptr = std::copy(mOutputOwner2.begin(), mOutputOwner2.end(), msg_ptr);
-    *msg_ptr++ = mOutputAmount1;
-    *msg_ptr++ = mOutputAmount2;
+    *msg_ptr = mOutputAmount1; msg_ptr+= sizeof(mOutputAmount1);
+    *msg_ptr = mOutputAmount2; msg_ptr+= sizeof(mOutputAmount2);
     *msg_ptr++ = mTimeDelay;
     *msg_ptr++ = mChannelState;
     msg_ptr = std::copy(mMessageSigner.begin(), mMessageSigner.end(), msg_ptr);
