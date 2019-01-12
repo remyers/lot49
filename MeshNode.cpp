@@ -13,16 +13,18 @@ using namespace lot49;
 // simulation parameters
 //
 
-static double sGatewayPercent = 0.2; // percent of nodes that are also internet gateways
-static double sMaxSize = 5000; // meters width
-static double sMoveRate = 85; // meters per minute
-static int sPauseTime = 5; // minutes of simulation
-static int sCurrentTime = 0; // minutes of simulation
-static int sPayloadSize = 50; // bytes
-static int sRadioRange = 800; // radio communication range in meters
+double MeshNode::sGatewayPercent = 0.2; // percent of nodes that are also internet gateways
+double MeshNode::sOriginatingPercent = 1.0;
+double MeshNode::sMaxSize = 5000; // meters width
+double MeshNode::sMoveRate = 85; // meters per minute
+int MeshNode::sPauseTime = 5; // minutes of simulation
+int MeshNode::sCurrentTime = 0; // minutes of simulation
+int MeshNode::sPayloadSize = 50; // bytes
+int MeshNode::sRadioRange = 1600; // radio communication range in meters
 
-std::vector<lot49::MeshNode> lot49::MeshNode::sNodes;
-std::list<lot49::MeshRoute> lot49::MeshNode::sRoutes;
+std::vector<lot49::MeshNode> MeshNode::sNodes;
+std::list<lot49::MeshRoute> MeshNode::sRoutes;
+std::string MeshNode::sParametersString;
 
 static std::default_random_engine rng(std::random_device{}());
 static std::uniform_int_distribution<uint8_t> dist(0, 255); //(min, max)
@@ -150,8 +152,9 @@ std::ostream &operator<<(std::ostream &out, const MeshMessage &m)
 
 static std::ofstream sLogfile;
 std::ofstream& LOG() {
+    std::string filename = MeshNode::sParametersString + std::string("lot49.log");
     if (!sLogfile.is_open()) {
-        sLogfile.open("lot49.log");
+        sLogfile.open(filename);
     }
     return sLogfile;
 };
@@ -160,7 +163,8 @@ std::ofstream& LOG() {
 static std::ofstream sStatsfile;
 std::ofstream& STATS() {
     if (!sStatsfile.is_open()) {
-        sStatsfile.open("lot49_stats.csv");
+        std::string filename = MeshNode::sParametersString + "lot49_stats.csv";
+        sStatsfile.open(filename);
         sStatsfile << "time, label, sender, receiver, source, destination, distance, incentive type, prepaid tokens, relay path size, agg signature size, is witness, payload data size, receiver unspent tokens, receiver channel state, receiver channel confirmed" << endl;
     }
     return sStatsfile;
@@ -214,6 +218,8 @@ void MeshNode::WriteStats(const std::string& inLabel, const lot49::MeshMessage& 
 // create mesh nodes
 void MeshNode::CreateNodes(const int inCount)
 {
+    sCurrentTime = 0;
+    sNodes.clear();
     sNodes.resize(inCount); 
 
     // default witness node
@@ -278,7 +284,7 @@ void MeshNode::ClearRoutes() {
 }
 
 // recursively find shortest route to a node
-bool MeshNode::FindRoute(const HGID inDestination, MeshRoute& ioRoute, std::list<HGID>& ioVisited, double& ioDistance) 
+bool MeshNode::FindRoute(const HGID inDestination, const int inDepth, MeshRoute& ioRoute, std::list<HGID>& ioVisited, double& ioDistance) 
 {
     // at destination node
     if (inDestination == GetHGID()) {
@@ -286,6 +292,37 @@ bool MeshNode::FindRoute(const HGID inDestination, MeshRoute& ioRoute, std::list
         ioRoute.push_back(GetHGID());
         return true;
     }
+
+    if (inDepth <= 0) {
+        return false;
+    }
+
+    /*
+    // check cached routes
+    for (auto cached_route : sRoutes) {
+        if (cached_route.front() == GetHGID() && cached_route.back() == inDestination) {
+            // use saved sub-route
+            ioRoute.clear();
+            ioRoute.insert(ioRoute.begin(), cached_route.begin(), cached_route.end());
+            auto next_node = ioRoute.begin();
+            std::advance(next_node,1);
+            double distance = Distance(mCurrentPos, MeshNode::FromHGID(*next_node).mCurrentPos);
+            ioDistance = distance;
+            return true;
+        }
+        if (cached_route.front() == inDestination && cached_route.back() == GetHGID()) {
+            // use reverse of saved sub-route
+            ioRoute.clear();
+            cached_route.reverse();
+            ioRoute.insert(ioRoute.begin(), cached_route.begin(), cached_route.end());
+            auto next_node = ioRoute.begin();
+            std::advance(next_node,1);
+            double distance = Distance(mCurrentPos, MeshNode::FromHGID(*next_node).mCurrentPos);
+            ioDistance = distance;
+            return true;
+        }
+    }    
+    */
 
     ioVisited.push_back(GetHGID());
 
@@ -297,25 +334,31 @@ bool MeshNode::FindRoute(const HGID inDestination, MeshRoute& ioRoute, std::list
         if (n.GetHGID() == GetHGID()) {
             continue;
         }
-        // no loops, skip routes that already include this node
+
+        // find shortest distance to destination from nodes within radio range
+        double radio_range = Distance(mCurrentPos, n.mCurrentPos);
+        if (radio_range > sRadioRange) {
+            continue;
+        }
+
+        // no loops, skip routes already searched by this node or previous nodes
         if (std::find(ioVisited.begin(), ioVisited.end(), n.GetHGID()) != ioVisited.end()) {
             continue;
         }
-        // find shortest distance to destination from nodes within radio range
-        double radio_range = Distance(mCurrentPos, n.mCurrentPos);
-        if (radio_range < sRadioRange) {
-            MeshRoute route;
-            double distance = 0;
-            if (n.FindRoute(inDestination, route, ioVisited, distance) && (distance + radio_range) < min_distance) {
-                route.insert(route.begin(), GetHGID());
-                min_route = route;
-                min_distance = distance + radio_range;
-                found = true;
-            }
+         
+        // find route from candidate node to destination, depth-first-search
+        MeshRoute route;
+        double distance = 0;
+        int depth = inDepth - 1;
+        if (n.FindRoute(inDestination, depth, route, ioVisited, distance) && (distance + radio_range) < min_distance) {
+            route.insert(route.begin(), GetHGID());
+            min_route = route;
+            min_distance = distance + radio_range;
+            found = true;
         }
     }
 
-    // remove current node from visited list
+    // remove current node from visited list ??
     ioVisited.pop_back();
 
     if (found) {
@@ -325,52 +368,11 @@ bool MeshNode::FindRoute(const HGID inDestination, MeshRoute& ioRoute, std::list
     return found;
 }
 
-/*
-// recursively find shortest route to a node
-bool MeshNode::FindRoute(const HGID inDestination, MeshRoute& ioRoute, std::list<HGID>& ioVisited, double& ioDistance) 
+bool MeshNode::IsWithinRange(HGID inNode2)
 {
-    // at destination node
-    if (inDestination == GetHGID()) {
-        ioRoute.push_back(GetHGID());
-        return true;
-    }
-
-    ioVisited.push_back(GetHGID());
-
-    double min_distance = std::numeric_limits<double>::max();
-    MeshRoute min_route;
-    bool found = false;
-    for ( auto& n : sNodes) {
-        // skip self
-        if (n.GetHGID() == GetHGID()) {
-            continue;
-        }
-        // no loops, skip routes that already include this node
-        if (std::find(ioVisited.begin(), ioVisited.end(), n.GetHGID()) != ioVisited.end()) {
-            continue;
-        }
-        // find shortest distance to destination from nodes within radio range
-        double distance = Distance(mCurrentPos, n.mCurrentPos);
-        if (distance < sRadioRange) {
-            MeshRoute route;
-            route.push_back(GetHGID());
-            distance += ioDistance;
-            if (distance < min_distance && n.FindRoute(inDestination, route, ioVisited, distance)) {
-                route.insert(route.begin(), ioRoute.begin(), ioRoute.end());
-                min_route = route;
-                min_distance = distance;
-                found = true;
-            }
-        }
-    }
-
-    if (found) {
-        ioDistance = min_distance;
-        ioRoute = min_route;
-    }
-    return found;
+    double distance = Distance(mCurrentPos, MeshNode::FromHGID(inNode2).mCurrentPos);
+    return (distance < MeshNode::sRadioRange);
 }
-*/
 
 HGID MeshNode::GetNextHop(HGID inNode, HGID inDestination)
 {
@@ -383,36 +385,31 @@ HGID MeshNode::GetNextHop(HGID inNode, HGID inDestination)
 
 bool MeshNode::GetNextHop(HGID inNode, HGID inDestination, HGID& outNextHop)
 {
-    // next hop along shortest breadth-first search route
+        // next hop along shortest depth-first search route
     double distance = 0;
     MeshNode& node = MeshNode::FromHGID(inNode);
     MeshRoute route;
     std::list<HGID> visited;
-    bool found = node.FindRoute(inDestination, route, visited, distance);
+    int depth = 5;
+    bool found = node.FindRoute(inDestination, depth, route, visited, distance);
     if (found) {
-        outNextHop = route[1];
+        auto iter = route.begin();
+        iter++;
+        outNextHop = *iter;
+        _log << "Next Hop: " << std::hex << inNode << " -> " << std::hex << inDestination << " = " << std::hex << outNextHop << endl;
 
         // only add route if not already added
         if (std::find(sRoutes.begin(), sRoutes.end(), route) == sRoutes.end()) {
             AddRoute(route);
         }
     }
-    else {
-        // use pre-set routes
-        for (auto route = sRoutes.begin(); route != sRoutes.end(); ++route) {
-            auto node_iter = std::find(route->begin(), route->end(), inNode);
-            auto neighbor_iter = std::find(route->begin(), route->end(), inDestination);
-            if (node_iter != route->end() && neighbor_iter != route->end()) {
-                std::ptrdiff_t diff = std::distance(node_iter, neighbor_iter);
-                assert(diff != 0);
-                MeshRoute::iterator next_hop_iter = node_iter + (diff/abs(diff));
-                outNextHop = *next_hop_iter;
-                found = true;
-            }
-        }
-    }
 
     return found;
+}
+
+void MeshNode::AddGateway(const HGID inNode)
+{
+    MeshNode::FromHGID(inNode).mIsGateway = true;
 }
 
 // configure topology
@@ -422,20 +419,18 @@ void MeshNode::AddRoute(MeshRoute inRoute)
     if (std::find(sRoutes.begin(), sRoutes.end(), inRoute) != sRoutes.end()) {
         return;
     }
-    sRoutes.push_back(inRoute);
+    sRoutes.push_front(inRoute);
 
-    // propose channels with neighbors (forward)
-    auto route_end = inRoute.begin() + (inRoute.size() - 1);
+    auto route_end = inRoute.begin();
+    std::advance(route_end, inRoute.size() - 1);
     for (auto hgid_iter = inRoute.begin(); hgid_iter != route_end; ++hgid_iter) {
         //_log << "Node " << std::hex << *hgid_iter << ", Neighbor " << *(hgid_iter+1) << endl;
-        FromHGID(*hgid_iter).ProposeChannel(*(hgid_iter+1));
-    }
-
-    // propose channels with neighbors (backwards)
-    auto route_rend = inRoute.rbegin() + (inRoute.size() - 1);
-    for (auto hgid_iter = inRoute.rbegin(); hgid_iter != route_rend; ++hgid_iter) {
-        //_log << "Node: " << std::hex << *hgid_iter << " Neighbor: " << *(hgid_iter+1) << endl;
-        FromHGID(*hgid_iter).ProposeChannel(*(hgid_iter+1));
+        auto neighbor_iter = hgid_iter;
+        std::advance(neighbor_iter, 1);
+        // propose channels with neighbors (forward)
+        FromHGID(*hgid_iter).ProposeChannel(*neighbor_iter);
+        // propose channels with neighbors (backwards)
+        FromHGID(*neighbor_iter).ProposeChannel(*hgid_iter);
     }
 }
 
@@ -449,7 +444,8 @@ bool MeshNode::HasNeighbor(HGID inNode, HGID inNeighbor)
         auto node_iter = std::find(route->begin(), route->end(), inNode);
         auto neighbor_iter = std::find(route->begin(), route->end(), inNeighbor);
         if (node_iter != route->end() && neighbor_iter != route->end()) {
-            found = (abs(std::distance(node_iter, neighbor_iter)) == 1);
+            // check if nodes are adjacent
+            found = (*(++node_iter) == inNeighbor || *(++neighbor_iter) == inNode);
         }
     }
     return found;
@@ -598,6 +594,12 @@ bool MeshNode::OriginateMessage(const HGID inDestination, const std::vector<uint
     _log << "Node " << GetHGID() << ", ";
     _log << "OriginateMessage, Destination: " << inDestination << ", Payload: [" << payload_text << "]" << endl << endl;
 
+    // do not send messages if correspondent is within radio range, no incentive costs for local transmissions
+    if (IsWithinRange(inDestination)) {
+        _log << "!! within radio range, no incentives !!" << endl;
+        return true;
+    }
+
     HGID next_hop;
     if (!GetNextHop(GetHGID(), inDestination, next_hop)) {
         _log << "!! No route found !!" << endl;
@@ -742,9 +744,9 @@ void MeshNode::ReceiveMessage(const MeshMessage& inMessage)
     _log << "Node " << GetHGID() << ", ";
     _log << "ReceiveMessage: " << inMessage << endl;
 
-    // confirm setup transaction on the blockchain
+    // confirm setup transaction on the blockchain if channel needed to relay or originate a message
     PeerChannel &theSenderChannel = GetChannel(GetHGID(), inMessage.mSender);
-    if (theSenderChannel.mConfirmed == false) {
+    if (theSenderChannel.mConfirmed == false && inMessage.mIncentive.mType != eSetup1) {
         HGID gateway;
         if (!GetNearestGateway(gateway)) {
             _log << "!! No route to gateway !! " << endl;    
@@ -843,7 +845,15 @@ void MeshNode::RelayDeliveryReceipt(const MeshMessage& inMessage)
         // relay return receipt
         MeshMessage theMessage = inMessage;
         theMessage.mSender = GetHGID();
-        theMessage.mReceiver = GetNextHop(GetHGID(), inMessage.mSource);
+
+
+        // determine next hop from the relay path, no searching
+        // theMessage.mReceiver = GetNextHop(GetHGID(), inMessage.mSource);
+        ptrdiff_t pos = (std::find(theMessage.mIncentive.mRelayPath.begin(), 
+            theMessage.mIncentive.mRelayPath.end(), GetHGID()) - theMessage.mIncentive.mRelayPath.begin());
+        HGID theNextHop = (pos > 0 ? theMessage.mIncentive.mRelayPath[pos-1] : inMessage.mSource);
+        _log << "Next Hop (relay path): " << std::hex << GetHGID() << " -> " << std::hex << inMessage.mSource << " = " << std::hex << theNextHop << endl;
+        theMessage.mReceiver = theNextHop;
 
         // use cached hash of payload, do not resend payload with receipt
         theMessage.mPayloadData.clear();
@@ -880,6 +890,8 @@ bool MeshNode::ConfirmSetupTransaction(const MeshMessage& inMessage, const HGID 
         theSenderChannel.mConfirmed = true;
         return true;
     }
+
+
 
     HGID next_hop;
     if (!GetNextHop(GetHGID(), inGateway, next_hop)) {
@@ -1259,7 +1271,8 @@ bool MeshNode::GetNearestGateway(HGID& outGateway)
         double distance;
         MeshRoute route;
         HGID hgid = n.GetHGID();
-        bool found = FindRoute(hgid, route, visited, distance);
+        int depth = 5;
+        bool found = FindRoute(hgid, depth, route, visited, distance);
         if (found && distance < min_distance) {
             outGateway = hgid;
             route_found = true;
@@ -1390,7 +1403,8 @@ void L49Header::FromBytes(const std::vector<uint8_t>& inData)
 static std::ofstream sTopology;
 std::ofstream& TOPOLOGY() {
     if (!sTopology.is_open()) {
-        sTopology.open("lot49_topology.csv");
+        std::string filename = MeshNode::sParametersString + "lot49_topology.csv";
+        sTopology.open(filename);
         sTopology << "time, node, correspondent, distance, current x, current y, paused" << endl;
     }
     return sTopology;
@@ -1399,8 +1413,6 @@ std::ofstream& TOPOLOGY() {
 
 void MeshNode::PrintTopology() 
 {
-    // header
-    _log << "     \t";
     for (auto& node1 : sNodes) {
         _topology << sCurrentTime << ", ";
         _topology << std::hex << std::setw(4) << node1.GetHGID() << ", ";
@@ -1413,27 +1425,30 @@ void MeshNode::PrintTopology()
     
     /*
     for (auto& node1 : sNodes) {
-        _log << std::hex << std::setw(4) << node1.GetHGID() << "   ";
         for (auto& node2 : sNodes) {
-            if (node1.GetHGID() == node2.GetHGID()) {
-                _log << "\t ---- ";
-            }
-            else {
+            if (node1.GetHGID() != node2.GetHGID()) {
                 MeshRoute route;
                 std::list<HGID> visited;
                 double distance;
                 bool found = node1.FindRoute(node2.GetHGID(), route, visited, distance);
                 if (found) {
-                    _log << "\t" << (float)distance << "(" << route.size() << ") ";
-                }
-                else {
-                    _log << "\t XXXX ";
+                    _log << std::hex << std::setw(4) << node1.GetHGID() << "->" << std::hex << std::setw(4) << node2.GetHGID() << ", distance = " << (float) distance << ", hops = " << std::dec << route.size() << ", route = ";
+                    for (auto hgid : route) {
+                        _log << std::hex << std::setw(4) << hgid << ", ";
+                    }
+                    _log << endl;
                 }
             }
         }
-        _log << endl;
     }
     */
+}
+
+void MeshNode::CloseLogs()
+{
+    sLogfile.close();
+    sStatsfile.close();
+    sTopology.close();
 }
 
 // update position of all nodes, update routes and send messages
@@ -1485,8 +1500,10 @@ void MeshNode::UpdateSimulation()
     PrintTopology();
 
     // send message to correspondent each round
+    int originating = 0;
+    int max_originating = sOriginatingPercent * sNodes.size();
     for (auto& n : sNodes) {
-        if (n.GetHGID() != n.mCorrespondent) {
+        if (originating++ < max_originating && n.GetHGID() != n.mCorrespondent) {
             // send a message and receive delivery receipt
             std::vector<uint8_t> payload(sPayloadSize, 'A');
             if (n.OriginateMessage(n.mCorrespondent, payload)) {

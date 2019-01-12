@@ -3,6 +3,7 @@ CMakeFiles
 cmake_install.cmake
 Makefile
 build/*
+results/*
 
 main
 .o

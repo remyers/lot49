@@ -13,7 +13,7 @@ namespace lot49
 typedef uint16_t HGID;
 
 // Mesh route
-typedef std::vector<HGID> MeshRoute;
+typedef std::list<HGID> MeshRoute;
 
 //
 // incentive headers
@@ -120,6 +120,8 @@ class MeshNode
 
     static void WriteStats(const std::string& inLabel, const MeshMessage& inMessage);
 
+    static void CloseLogs();
+
     MeshNode();
 
     HGID GetHGID() const;
@@ -148,12 +150,25 @@ class MeshNode
 
     bool GetNearestGateway(HGID& outGatewayNode);
 
-    friend std::ostream &operator<<(std::ostream &out, const MeshNode &n);
+    bool IsWithinRange(HGID inNode2);
+
+    friend std::ostream &operator<<(std::ostream &out, const MeshNode &n);  
+    static std::string sParametersString;
+
+    static double sGatewayPercent; // percent of nodes that are also internet gateways
+    static double sOriginatingPercent; // percent of nodes that originate messages
+    static double sMaxSize; // meters width
+    static double sMoveRate; // meters per minute
+    static int sPauseTime; // minutes of simulation
+    static int sPayloadSize; // bytes
+    static int sRadioRange; // radio communication range in meters
+
+    static int sCurrentTime; // minutes of simulation
 
   private:
 
     // recursively find shortest route to a node
-    bool FindRoute(const HGID inDestination, MeshRoute& ioRoute, std::list<HGID>& ioVisited, double& ioDistance);
+    bool FindRoute(const HGID inDestination, const int inDepth, MeshRoute& ioRoute, std::list<HGID>& ioVisited, double& ioDistance);
 
     // return true if channel exists with this neighbor
     bool HasChannel(HGID inProposer, HGID inFunder) const;

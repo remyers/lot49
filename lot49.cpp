@@ -35,11 +35,23 @@ int main(int argc, char* argv[])
 // test randomly moving nodes
 void test2()
 {
-   const size_t MAX_NODES = 25; 
-    MeshNode::CreateNodes(MAX_NODES);
-
-    for (int i = 0; i < 120; i++) {
-        MeshNode::UpdateSimulation();
+    auto t = std::time(nullptr);
+    auto tm = *std::localtime(&t);
+    const size_t MAX_NODES = 30;
+    
+    std::vector<int> sides = {5477, 4472, 3873, 3464, 3162, 2928};
+    for (auto side : sides) {
+        std::ostringstream oss;
+        oss << std::put_time(&tm, "%y%m%d_%H%M%S");        
+        oss << "_side-" << side;
+        oss << "_nodes-" << MAX_NODES << "_";
+        MeshNode::sParametersString = oss.str();
+        MeshNode::sMaxSize = side;
+        MeshNode::CreateNodes(MAX_NODES);
+        for (int i = 0; i < 60; i++) {
+            MeshNode::UpdateSimulation();
+        }
+        MeshNode::CloseLogs();
     }
 }
 
@@ -55,9 +67,10 @@ void test1()
         HGID hgid = MeshNode::FromIndex(i).GetHGID();
         route1.push_back(hgid);
     }
-    HGID A = route1.front();
-    HGID B = route1[1];
-    HGID C = route1[2];
+    auto iter = route1.begin();
+    HGID A = *iter++;
+    HGID B = *iter++;
+    HGID C = *iter++; 
     HGID D1 = route1.back();
     MeshRoute route2 = route1;
     route2.pop_back();
@@ -68,6 +81,7 @@ void test1()
     HGID gateway = MeshNode::FromIndex(MAX_NODES).GetHGID();
     route1.push_back(gateway);
     route2.push_back(gateway);
+    MeshNode::AddGateway(gateway);
 
     // add route from first to D1 node A->B->C->D1
     MeshNode::AddRoute(route1);
