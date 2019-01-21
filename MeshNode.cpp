@@ -35,7 +35,7 @@ const double random_num = dist(rng);
 namespace lot49
 {
 
-static uint16_t COMMITTED_TOKENS = 500;
+static uint16_t COMMITTED_TOKENS = 2000;
 static uint8_t PREPAID_TOKENS = 10;
 
 std::ostream& operator<< (std::ostream& out, ETransactionType inType)

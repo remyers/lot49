@@ -48,7 +48,7 @@ void test2()
         MeshNode::sParametersString = oss.str();
         MeshNode::sMaxSize = side;
         MeshNode::CreateNodes(MAX_NODES);
-        for (int i = 0; i < 60; i++) {
+        for (int i = 0; i < 120; i++) {
             MeshNode::UpdateSimulation();
         }
         MeshNode::CloseLogs();
