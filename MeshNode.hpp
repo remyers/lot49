@@ -108,9 +108,9 @@ class MeshNode
 
     static void ClearRoutes();
 
-    static HGID GetNextHop(HGID inNode, HGID inDestination);
+    static HGID GetNextHop(HGID inNode, HGID inDestination, int& outHops);
 
-    static bool GetNextHop(HGID inNode, HGID inDestination, HGID& outNextHop);
+    static bool GetNextHop(HGID inNode, HGID inDestination, HGID& outNextHop, int& outHops);
 
     static void AddGateway(HGID inNode);    
 
@@ -215,9 +215,12 @@ class MeshNode
     // verify the setup transaction for a payment channel with a witness node (via inGateway)
     bool ConfirmSetupTransaction(const MeshMessage& inMessage, const HGID inGateway);
 
+    void ChannelsBalances(int& outInChannels, int& outReceivedTokens, int& outOutChannels, int& outSpentTokens) const;
+
     // compute serialization of the Mesh Message for Witness verification
     std::vector<uint8_t> Serialize() const;
 
+    static int sSeed;
     static std::vector<MeshNode> sNodes;
 
     // routes computed by routing protocol

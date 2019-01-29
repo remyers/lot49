@@ -13,6 +13,7 @@ using namespace lot49;
 // simulation parameters
 //
 
+int MeshNode::sSeed = 0; 
 double MeshNode::sGatewayPercent = 0.2; // percent of nodes that are also internet gateways
 double MeshNode::sOriginatingPercent = 1.0;
 double MeshNode::sMaxSize = 5000; // meters width
@@ -36,7 +37,7 @@ namespace lot49
 {
 
 static uint16_t COMMITTED_TOKENS = 2000;
-static uint8_t PREPAID_TOKENS = 10;
+//static uint8_t PREPAID_TOKENS = 10;
 
 std::ostream& operator<< (std::ostream& out, ETransactionType inType)
 {
@@ -219,6 +220,7 @@ void MeshNode::WriteStats(const std::string& inLabel, const lot49::MeshMessage& 
 void MeshNode::CreateNodes(const int inCount)
 {
     sCurrentTime = 0;
+    sSeed = 0;
     sNodes.clear();
     sNodes.resize(inCount); 
 
@@ -237,7 +239,8 @@ void MeshNode::CreateNodes(const int inCount)
         HGID correspondent_node = MeshNode::FromIndex((i+1) % inCount).GetHGID();
         n.SetCorrespondentNode(correspondent_node);
 
-        if (i < num_gateways) {
+        // gateways evenly spaced in range
+        if ((i % (inCount/num_gateways)) == 0) {
             n.mIsGateway = true;
         }
 
@@ -374,16 +377,16 @@ bool MeshNode::IsWithinRange(HGID inNode2)
     return (distance < MeshNode::sRadioRange);
 }
 
-HGID MeshNode::GetNextHop(HGID inNode, HGID inDestination)
+HGID MeshNode::GetNextHop(HGID inNode, HGID inDestination, int& outHops)
 {
     HGID next_hop;
-    if (GetNextHop(inNode, inDestination, next_hop)) {
+    if (GetNextHop(inNode, inDestination, next_hop, outHops)) {
         return next_hop;
     }
     throw std::invalid_argument("No route to destination.");
 }
 
-bool MeshNode::GetNextHop(HGID inNode, HGID inDestination, HGID& outNextHop)
+bool MeshNode::GetNextHop(HGID inNode, HGID inDestination, HGID& outNextHop, int& outHops)
 {
         // next hop along shortest depth-first search route
     double distance = 0;
@@ -402,6 +405,7 @@ bool MeshNode::GetNextHop(HGID inNode, HGID inDestination, HGID& outNextHop)
         if (std::find(sRoutes.begin(), sRoutes.end(), route) == sRoutes.end()) {
             AddRoute(route);
         }
+        outHops = route.size();
     }
 
     return found;
@@ -454,7 +458,6 @@ bool MeshNode::HasNeighbor(HGID inNode, HGID inNeighbor)
 // ctor
 MeshNode::MeshNode()
 {
-    static uint8_t sSeed = 0;
     mSeed.resize(32);
     // std::generate_n(mSeed.begin(), 32, [&] { return dist(rng); });
 
@@ -601,7 +604,8 @@ bool MeshNode::OriginateMessage(const HGID inDestination, const std::vector<uint
     }
 
     HGID next_hop;
-    if (!GetNextHop(GetHGID(), inDestination, next_hop)) {
+    int hops;
+    if (!GetNextHop(GetHGID(), inDestination, next_hop, hops)) {
         _log << "!! No route found !!" << endl;
         return false;
     }
@@ -617,18 +621,18 @@ bool MeshNode::OriginateMessage(const HGID inDestination, const std::vector<uint
 
     assert(theChannel.mState == eSetup2 || theChannel.mState == eReceipt2 || theChannel.mState == eReceipt1);
 
-   if (theChannel.mUnspentTokens < PREPAID_TOKENS) {
+   if (theChannel.mUnspentTokens < hops) {
          _log << "!! insufficient funds, unspent tokens = " << theChannel.mUnspentTokens << " !!" << endl;
         return false;       
     }
 
-    theChannel.mUnspentTokens -= PREPAID_TOKENS;
-    theChannel.mSpentTokens += PREPAID_TOKENS;
+    theChannel.mUnspentTokens -= hops;
+    theChannel.mSpentTokens += hops;
     theChannel.mLastNonce += 1;
     theChannel.mState = (theMessage.mDestination == theMessage.mReceiver) ? eNegotiate2 : eNegotiate1;
     
     theMessage.mIncentive.mWitness = false;
-    theMessage.mIncentive.mPrepaidTokens = PREPAID_TOKENS;
+    theMessage.mIncentive.mPrepaidTokens = hops;
     theMessage.mIncentive.mSignature = theChannel.mRefundSignature;
     theMessage.mIncentive.mType = theChannel.mState;
 
@@ -668,7 +672,10 @@ void MeshNode::RelayMessage(const MeshMessage& inMessage)
     theSenderChannel.mLastNonce += 1;
     theSenderChannel.mState = inMessage.mIncentive.mType;
 
-    HGID next_hop = GetNextHop(GetHGID(), inMessage.mDestination);
+    int hops;
+    HGID next_hop = GetNextHop(GetHGID(), inMessage.mDestination, hops);
+
+    // TODO: check if payment enough to reach destination
 
     // pay next hop
     uint8_t spent_tokens = (inMessage.mIncentive.mPrepaidTokens - inMessage.mIncentive.mRelayPath.size()) - 1;
@@ -869,12 +876,12 @@ void MeshNode::RelayDeliveryReceipt(const MeshMessage& inMessage)
         SendTransmission(theMessage);
     }
     else if (inMessage.mIncentive.mWitness) {
-        _log << "Confirmation of channel setup received by relay " << std::setw(4) << std::setfill('0') << inMessage.mSource << " from Witness Node " << std::setw(4) << inMessage.mDestination << "!" << endl;
-        cout << "Confirmation of channel setup received by relay " << std::setw(4) << std::setfill('0') << inMessage.mSource << " from Witness Node " << std::setw(4) << inMessage.mDestination << "!" << endl;
+        _log << "Confirmation of channel setup received by relay " << std::setw(4) << std::setfill('0') << inMessage.mSource << " from Witness Node " << std::setw(4) << std::setfill('0') << inMessage.mDestination << "!" << endl;
+        cout << "Confirmation of channel setup received by relay " << std::setw(4) << std::setfill('0') << inMessage.mSource << " from Witness Node " << std::setw(4) << std::setfill('0') << inMessage.mDestination << "!" << endl;
     }
     else {
-        _log << "Delivery Receipt received by source " << std::setw(4) << std::setfill('0') << inMessage.mSource << " from message destination " << std::setw(4) << inMessage.mDestination << "!" << endl;
-        cout << "Delivery Receipt received by source " << std::setw(4) << std::setfill('0') << inMessage.mSource << " from message destination " << std::setw(4) << inMessage.mDestination << "!" << endl;
+        _log << "Delivery Receipt received by source " << std::setw(4) << std::setfill('0') << inMessage.mSource << " from message destination " << std::setw(4) << std::setfill('0') << inMessage.mDestination << "!" << endl;
+        cout << "Delivery Receipt received by source " << std::setw(4) << std::setfill('0') << inMessage.mSource << " from message destination " << std::setw(4) << std::setfill('0') << inMessage.mDestination << "!" << endl;
     }
 }
 
@@ -894,7 +901,8 @@ bool MeshNode::ConfirmSetupTransaction(const MeshMessage& inMessage, const HGID 
 
 
     HGID next_hop;
-    if (!GetNextHop(GetHGID(), inGateway, next_hop)) {
+    int hops;
+    if (!GetNextHop(GetHGID(), inGateway, next_hop, hops)) {
         _log << "!! No route found !!" << endl;
         return false;
     }
@@ -911,18 +919,18 @@ bool MeshNode::ConfirmSetupTransaction(const MeshMessage& inMessage, const HGID 
 
     assert(theChannel.mState == eSetup2 || theChannel.mState == eReceipt2 || theChannel.mState == eReceipt1);
 
-    if (theChannel.mUnspentTokens < PREPAID_TOKENS) {
+    if (theChannel.mUnspentTokens < hops) {
          _log << "!! insufficient funds, unspent tokens = " << theChannel.mUnspentTokens << " !!" << endl;
         return false;       
     }
 
-    theChannel.mUnspentTokens -= PREPAID_TOKENS;
-    theChannel.mSpentTokens += PREPAID_TOKENS;
+    theChannel.mUnspentTokens -= hops;
+    theChannel.mSpentTokens += hops;
     theChannel.mLastNonce += 1;
     theChannel.mState = (theMessage.mDestination == theMessage.mReceiver ? eNegotiate2 : eNegotiate1);
     
     theMessage.mIncentive.mWitness = true;
-    theMessage.mIncentive.mPrepaidTokens = PREPAID_TOKENS;
+    theMessage.mIncentive.mPrepaidTokens = hops;
     theMessage.mIncentive.mSignature = theChannel.mRefundSignature;
     theMessage.mIncentive.mType = theChannel.mState;
 
@@ -988,7 +996,8 @@ bls::Signature MeshNode::GetAggregateSignature(const MeshMessage& inMessage, con
             // sending receipt back to source
             direction_hgid = inMessage.mSource;
         }
-        HGID next_hop_hgid = GetNextHop(GetHGID(), direction_hgid);
+        int hops;
+        HGID next_hop_hgid = GetNextHop(GetHGID(), direction_hgid, hops);
 
         const PeerChannel& theChannel = GetChannel( next_hop_hgid, GetHGID());
 
@@ -1267,6 +1276,10 @@ bool MeshNode::GetNearestGateway(HGID& outGateway)
     double min_distance = std::numeric_limits<double>::max();
     bool route_found = false;
     for (auto& n : sNodes) {
+        // search routes to  gateways
+        if (!n.GetIsGateway()) {
+            continue;
+        }
         std::list<HGID> visited;
         double distance;
         MeshRoute route;
@@ -1276,6 +1289,7 @@ bool MeshNode::GetNearestGateway(HGID& outGateway)
         if (found && distance < min_distance) {
             outGateway = hgid;
             route_found = true;
+            min_distance = distance;
         }
     }
     return route_found;
@@ -1400,12 +1414,27 @@ void L49Header::FromBytes(const std::vector<uint8_t>& inData)
     assert(offset == inData.size());
 }
 
+void MeshNode::ChannelsBalances(int& outInChannels, int& outInBalance, int& outOutChannels, int& outOutChannelBalance) const
+{
+    outInChannels = outInBalance = outOutChannels = outOutChannelBalance = 0;
+    for (const auto& ch : mPeerChannels) {
+        if (ch.second.mFundingPeer == GetHGID()) {
+            outOutChannels++;
+            outOutChannelBalance += ch.second.mSpentTokens;
+        }
+        else {
+            outInChannels++;
+            outInBalance += ch.second.mSpentTokens;
+        }
+    }
+}
+
 static std::ofstream sTopology;
 std::ofstream& TOPOLOGY() {
     if (!sTopology.is_open()) {
         std::string filename = MeshNode::sParametersString + "lot49_topology.csv";
         sTopology.open(filename);
-        sTopology << "time, node, correspondent, distance, current x, current y, paused" << endl;
+        sTopology << "time, node, correspondent, distance, current_x, current_y, paused, next_node, in_channels, out_channels, received_tokens, spent_tokens" << endl;
     }
     return sTopology;
 };
@@ -1415,12 +1444,24 @@ void MeshNode::PrintTopology()
 {
     for (auto& node1 : sNodes) {
         _topology << sCurrentTime << ", ";
-        _topology << std::hex << std::setw(4) << node1.GetHGID() << ", ";
-        _topology << std::hex << std::setw(4) << node1.mCorrespondent << ", ";
+        _topology << std::hex << std::setw(4) << std::setfill('0') << node1.GetHGID() << ", ";
+        _topology << std::hex << std::setw(4) << std::setfill('0') << node1.mCorrespondent << ", ";
         _topology << std::dec << (int) Distance(node1.mCurrentPos, MeshNode::FromHGID(node1.mCorrespondent).mCurrentPos) << ", ";
         _topology << std::dec << (int) node1.mCurrentPos.first << ", ";
         _topology << std::dec << (int) node1.mCurrentPos.second << ", ";
-        _topology << (node1.mPausedUntil > sCurrentTime ? "true" : "false") << endl;
+        _topology << (node1.mPausedUntil > sCurrentTime ? "true" : "false") << ", ";
+        HGID next_hop;
+        int hops;
+        if (GetNextHop(node1.GetHGID(), node1.GetCorrespondentNode(),next_hop, hops)) {
+            _topology << std::hex << std::setw(4) << std::setfill('0') << next_hop << ", ";
+        }
+        else {
+            _topology << "<none> " << ", ";
+        }
+        int in_channels, received_tokens, out_channels, spent_tokens;
+        node1.ChannelsBalances(in_channels, received_tokens, out_channels, spent_tokens);
+        _topology << std::dec << in_channels << ", " << std::dec << out_channels << ", ";
+        _topology << std::dec << received_tokens << ", " << std::dec << spent_tokens << endl;        
     }
     
     /*
@@ -1507,10 +1548,10 @@ void MeshNode::UpdateSimulation()
             // send a message and receive delivery receipt
             std::vector<uint8_t> payload(sPayloadSize, 'A');
             if (n.OriginateMessage(n.mCorrespondent, payload)) {
-                cout << std::hex << endl << "Node " << std::setw(4) << std::setfill('0') << n.GetHGID() << ": send a message to Node " << std::setw(4) << n.mCorrespondent << endl;
+                cout << std::hex << endl << "Node " << std::setw(4) << std::setfill('0') << n.GetHGID() << ": send a message to Node " << std::setw(4) << std::setfill('0') << n.mCorrespondent << endl;
             }
             else {
-                cout << std::hex << endl << "Node " << std::setw(4) << std::setfill('0') << n.GetHGID() << ": no route to Node " << std::setw(4) << n.mCorrespondent << endl;
+                cout << std::hex << endl << "Node " << std::setw(4) << std::setfill('0') << n.GetHGID() << ": no route to Node " << std::setw(4) << std::setfill('0') << n.mCorrespondent << endl;
             }
         }
     }

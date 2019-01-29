@@ -39,9 +39,10 @@ void test2()
     auto tm = *std::localtime(&t);
     const size_t MAX_NODES = 30;
     
-    std::vector<int> sides = {5477, 4472, 3873, 3464, 3162, 2928};
-    for (auto side : sides) {
+     std::vector<int> sides = {5477, 4472, 3873, 3464, 3162, 2928};
+     for (auto side : sides) {
         std::ostringstream oss;
+        oss << "results/";
         oss << std::put_time(&tm, "%y%m%d_%H%M%S");        
         oss << "_side-" << side;
         oss << "_nodes-" << MAX_NODES << "_";
