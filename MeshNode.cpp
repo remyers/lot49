@@ -1419,12 +1419,16 @@ void MeshNode::ChannelsBalances(int& outInChannels, int& outInBalance, int& outO
     outInChannels = outInBalance = outOutChannels = outOutChannelBalance = 0;
     for (const auto& ch : mPeerChannels) {
         if (ch.second.mFundingPeer == GetHGID()) {
-            outOutChannels++;
-            outOutChannelBalance += ch.second.mSpentTokens;
+            if (ch.second.mSpentTokens > 0) {
+                outOutChannels++;
+                outOutChannelBalance += ch.second.mSpentTokens;
+            }
         }
         else {
-            outInChannels++;
-            outInBalance += ch.second.mSpentTokens;
+            if (ch.second.mSpentTokens > 0) {
+                outInChannels++;
+                outInBalance += ch.second.mSpentTokens;
+            }
         }
     }
 }
