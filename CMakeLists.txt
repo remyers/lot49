@@ -20,7 +20,7 @@ link_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/bls-signatures
   )
 
-find_library(bls NAMES bls PATHS ${CMAKE_CURRENT_SOURCE_DIR}/bls-signatures)
+find_library(bls NAMES libbls.a PATHS ${CMAKE_CURRENT_SOURCE_DIR}/bls-signatures)
 
 add_executable(lot49 lot49.cpp MeshNode.cpp ImpliedTransaction.cpp)
 target_link_libraries(lot49 bls)
