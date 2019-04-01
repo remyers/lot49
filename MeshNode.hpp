@@ -15,6 +15,8 @@ typedef uint16_t HGID;
 // Mesh route
 typedef std::list<HGID> MeshRoute;
 
+static uint16_t COMMITTED_TOKENS = 2000;
+
 //
 // incentive headers
 //
@@ -38,6 +40,7 @@ struct PeerChannel
     HGID mProposingPeer;
     uint16_t mUnspentTokens;
     uint16_t mSpentTokens;
+    int16_t mPromisedTokens;
     uint16_t mLastNonce; // used to create unique shared 2-of-2 address
     EChannelState mState; // Setup1 -> Setup2 -> Negotiate1 -> Negotiate2 -> Receipt1 -> Receipt2 -> (Close1 -> Close2) or (back to Negotiate1)
     std::vector<uint8_t> mRefundSignature; // bls::Signature::SIGNATURE_SIZE
@@ -51,6 +54,8 @@ static const uint8_t MAXRELAYS = 5;
 
 struct L49Header
 {
+    friend std::ostream& operator<<(std::ostream& out, const L49Header& i);
+
     bool mWitness; // witness verification?
     EChannelState mType;
     uint8_t mPrepaidTokens;
@@ -70,6 +75,8 @@ struct L49Header
 
 struct MeshMessage
 {
+    friend std::ostream& operator<<(std::ostream& out, const MeshMessage& m);
+
     HGID mSender;
     HGID mReceiver;
     HGID mSource;
@@ -175,9 +182,10 @@ class MeshNode
 
     // get existing peer channel open with neighbor 
     PeerChannel& GetChannel(HGID inProposer, HGID inFunder);
+    const PeerChannel& GetChannel(HGID inProposer, HGID inFunder) const;
 
     //
-    bls::Signature GetAggregateSignature(const MeshMessage& inMessage, const bool isSigning);
+    bls::Signature GetAggregateSignature(const MeshMessage& inMessage, const bool isSigning) const;
 
     // 
     static std::vector<ImpliedTransaction> GetTransactions(const MeshMessage& inMessage);
@@ -198,7 +206,7 @@ class MeshNode
     void ReceiveTransmission(const MeshMessage& inMessage);
 
     // check that aggregate signature is valid
-    bool VerifyMessage(const MeshMessage &inMessage);
+    bool VerifyMessage(const MeshMessage &inMessage) const;
 
     // relay a message
     void RelayMessage(const MeshMessage& inMessage);
@@ -216,6 +224,8 @@ class MeshNode
     bool ConfirmSetupTransaction(const MeshMessage& inMessage, const HGID inGateway);
 
     void ChannelsBalances(int& outInChannels, int& outReceivedTokens, int& outOutChannels, int& outSpentTokens) const;
+
+    bool VerifySetupTransaction(const MeshMessage& inMessage);
 
     // compute serialization of the Mesh Message for Witness verification
     std::vector<uint8_t> Serialize() const;
@@ -242,6 +252,8 @@ class MeshNode
     std::pair<double, double> mWaypoint; // meters from origin
     HGID mCorrespondent;
     int mPausedUntil; // simulation minutes
+
+    friend std::ostream& operator<<(std::ostream& out, const MeshNode& n);
 };
 
 }; // namespace lot49

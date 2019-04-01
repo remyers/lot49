@@ -1,10 +1,13 @@
 
 #include "MeshNode.hpp"
+#include "Ledger.hpp"
+#include "Utils.hpp"
 #include <random>
 #include <algorithm>
 #include <cassert>
 #include <iterator>
 #include <fstream>
+#include <deque>
 
 using namespace std;
 using namespace lot49;
@@ -27,150 +30,11 @@ std::vector<lot49::MeshNode> MeshNode::sNodes;
 std::list<lot49::MeshRoute> MeshNode::sRoutes;
 std::string MeshNode::sParametersString;
 
-static std::default_random_engine rng(std::random_device{}());
-static std::uniform_int_distribution<uint8_t> dist(0, 255); //(min, max)
-
-//get one
-const double random_num = dist(rng);
+//static std::default_random_engine rng(std::random_device{}());
+static std::default_random_engine rng(0); // deterministic random seed
 
 namespace lot49
 {
-
-static uint16_t COMMITTED_TOKENS = 2000;
-//static uint8_t PREPAID_TOKENS = 10;
-
-std::ostream& operator<< (std::ostream& out, ETransactionType inType)
-{
-    switch (inType)
-    {
-        case ETransactionType::eIssue : return out << "eIssue" ;
-        case ETransactionType::eTransfer: return out << "eTransfer";
-        case ETransactionType::eSetup: return out << "eSetup";
-        case ETransactionType::eRefund: return out << "eRefund";
-        case ETransactionType::eUpdateAndSettle: return out << "eUpdateAndSettle";
-        case ETransactionType::eClose: return out << "eClose";
-        // omit default case to trigger compiler warning for missing cases
-    };
-    return out << static_cast<std::uint16_t>(inType);
-}
-
-std::ostream& operator<< (std::ostream& out, EChannelState inType)
-{
-    switch (inType)
-    {
-        case EChannelState::eSetup1 : return out << "eSetup1" ;
-        case EChannelState::eSetup2 : return out << "eSetup2";
-        case EChannelState::eNegotiate1: return out << "eNegotiate1";
-        case EChannelState::eNegotiate2: return out << "eNegotiate2";
-        case EChannelState::eNegotiate3: return out << "eNegotiate3";
-        case EChannelState::eReceipt1: return out << "eReceipt1";
-        case EChannelState::eReceipt2: return out << "eReceipt2";
-        case EChannelState::eClose1: return out << "eClose1";
-        case EChannelState::eClose2: return out << "eClose2";
-        // omit default case to trigger compiler warning for missing cases
-    };
-    return out << static_cast<std::uint16_t>(inType);
-}
-
-std::ostream &operator<<(std::ostream &out, const std::vector<HGID> &v) {
-    out << std::hex;
-    for (auto hgid : v) {
-        out << std::setw(2) << std::setfill('0') << static_cast<int>(hgid);
-    }
-    return out;
-}
-
-double Distance(const std::pair<double, double>& inA, const std::pair<double, double>& inB)
-{
-    // otherwise, move towards waypoint
-    const double& x1 = inA.first;
-    const double& y1 = inA.second;
-    const double& x2 = inB.first;
-    const double& y2 = inB.second;
-
-    double distance = sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
-    return distance;
-}
-
-std::ostream &operator<<(std::ostream &out, const MeshNode &n)
-{
-    out << "HGID: " << std::hex << std::setw(4) << std::setfill('0') << n.GetHGID() << endl;
-    out << "\tptr = 0x" << std::hex << &n << endl;
-    out << "\tWitness: " << n.mWitnessNode << endl;
-    out << "\tGateway: " << (n.mIsGateway ? "true" : "false") << endl;
-    out << "\tCorrespondent: " << n.mCorrespondent;
-    out << " (distance = " << Distance(n.mCurrentPos, MeshNode::FromHGID(n.mCorrespondent).mCurrentPos) << ")" << endl;
-    out << "\tPublic Key: " << n.GetPublicKey() << endl;
-    out << "\tSeed: ";
-    out << std::hex;
-    for (auto byte : n.mSeed ) {
-        out << std::setw(2) << std::setfill('0') << static_cast<int>(byte);
-    } 
-    return out;
-}
-
-std::ostream& operator<<(std::ostream &out, const L49Header &i)
-{
-    out << "Incentive, Type: " << i.mType << " Prepaid Tokens: " << (int) i.mPrepaidTokens  << (i.mWitness ? " (Witness) " : "-") << endl;
-    out << "\tRelay Path: [";
-    out << std::hex;
-    for (auto  byte : i.mRelayPath) {
-        out << std::setw(2) << std::setfill('0') << static_cast<int>(byte);
-    } 
-    out << "]";
-    /*
-    out << "\tSignature: ";
-    out << std::hex;
-    for (auto  byte : i.mSignature) {
-        out << std::setw(2) << std::setfill('0') << static_cast<int>(byte);
-    } 
-    out << endl;
-    */
-   return out;
-}
-
-std::ostream &operator<<(std::ostream &out, const MeshMessage &m)
-{
-    out << "Message, Source: " << std::setw(2) << std::setfill('0') << m.mSource;
-    out << " Sender: " << std::setw(2) << std::setfill('0') << m.mSender;
-    out << " Receiver: " << std::setw(2) << std::setfill('0') << m.mReceiver;
-    out << " Destination: " << std::setw(2) << std::setfill('0') << m.mDestination;
-    if (m.mPayloadData.empty()) {
-        out << " Payload: " << endl << "\t[]" << endl;
-    }
-    else if (m.mIncentive.mWitness) {
-        MeshMessage witness_message;
-        witness_message.FromBytes(m.mPayloadData);
-        out << " Payload: Witness: " << endl << "\t[" << witness_message << "]" << endl;
-    }
-    else {
-        std::string payload_text(reinterpret_cast<const char*>(m.mPayloadData.data()), m.mPayloadData.size());
-        out << " Payload: " << endl << "\t[" << payload_text << "]" << endl;
-    }
-    out << "\t" << m.mIncentive;
-    return out;
-}
-
-static std::ofstream sLogfile;
-std::ofstream& LOG() {
-    std::string filename = MeshNode::sParametersString + std::string("lot49.log");
-    if (!sLogfile.is_open()) {
-        sLogfile.open(filename);
-    }
-    return sLogfile;
-};
-#define _log LOG()
-
-static std::ofstream sStatsfile;
-std::ofstream& STATS() {
-    if (!sStatsfile.is_open()) {
-        std::string filename = MeshNode::sParametersString + "lot49_stats.csv";
-        sStatsfile.open(filename);
-        sStatsfile << "time, label, sender, receiver, source, destination, distance, incentive type, prepaid tokens, relay path size, agg signature size, is witness, payload data size, receiver unspent tokens, receiver channel state, receiver channel confirmed" << endl;
-    }
-    return sStatsfile;
-};
-#define _stats STATS()
 
 void MeshNode::WriteStats(const std::string& inLabel, const lot49::MeshMessage& inMessage)
 {
@@ -183,13 +47,13 @@ void MeshNode::WriteStats(const std::string& inLabel, const lot49::MeshMessage& 
     // label
     _stats << inLabel << ", ";
     // sender
-    _stats << std::hex << setw(4) << (int) inMessage.mSender << ", ";    
+    _stats << std::hex << std::setw(4) << (int) inMessage.mSender << ", ";    
     // receiver
-    _stats << std::hex << setw(4) << (int) inMessage.mReceiver << ", ";
+    _stats << std::hex << std::setw(4) << (int) inMessage.mReceiver << ", ";
     // source
-     _stats << std::hex << setw(4) << (int) inMessage.mSource << ", ";   
+     _stats << std::hex << std::setw(4) << (int) inMessage.mSource << ", ";   
     // destination
-    _stats << std::hex << setw(4) << (int) inMessage.mDestination << ", ";
+    _stats << std::hex << std::setw(4) << (int) inMessage.mDestination << ", ";
     // distance
     _stats << std::dec << (int) tx_distance << ", ";
     // incentive_type
@@ -209,10 +73,10 @@ void MeshNode::WriteStats(const std::string& inLabel, const lot49::MeshMessage& 
         PeerChannel& channel = receiver.GetChannel(inMessage.mReceiver, inMessage.mSender);
         _stats << std::dec << channel.mUnspentTokens << ", ";
         _stats << std::dec << channel.mState << ", ";
-        _stats << (channel.mConfirmed ? "true" : "false") << endl;
+        _stats << (channel.mConfirmed ? "true" : "false") << std::endl;
     }
     else {
-        _stats << std::dec << "-, -, -" << endl;
+        _stats << std::dec << "-, -, -" << std::endl;
     }
 }
 
@@ -399,7 +263,7 @@ bool MeshNode::GetNextHop(HGID inNode, HGID inDestination, HGID& outNextHop, int
         auto iter = route.begin();
         iter++;
         outNextHop = *iter;
-        _log << "Next Hop: " << std::hex << inNode << " -> " << std::hex << inDestination << " = " << std::hex << outNextHop << endl;
+        //_log << "Next Hop: " << std::hex << inNode << " -> " << std::hex << inDestination << " = " << std::hex << outNextHop << endl;
 
         // only add route if not already added
         if (std::find(sRoutes.begin(), sRoutes.end(), route) == sRoutes.end()) {
@@ -527,6 +391,7 @@ void MeshNode::ProposeChannel(HGID inNeighbor)
         theChannel.mProposingPeer = GetHGID();
         theChannel.mUnspentTokens = COMMITTED_TOKENS;
         theChannel.mSpentTokens = 0;
+        theChannel.mPromisedTokens = 0;
         theChannel.mLastNonce = 0;
         theChannel.mState = eSetup1;
         theChannel.mConfirmed = false;
@@ -562,6 +427,15 @@ bool MeshNode::HasChannel(HGID inProposer, HGID inFunder) const
 
 // get existing channel
 PeerChannel& MeshNode::GetChannel(HGID inProposer, HGID inFunder)
+{
+    auto channel_iter = mPeerChannels.find(make_pair(inProposer, inFunder));
+    if (channel_iter == mPeerChannels.end()) {
+        throw std::invalid_argument("No channel exists for neighbor.");
+    }
+    return channel_iter->second;
+}
+
+const PeerChannel& MeshNode::GetChannel(HGID inProposer, HGID inFunder) const
 {
     auto channel_iter = mPeerChannels.find(make_pair(inProposer, inFunder));
     if (channel_iter == mPeerChannels.end()) {
@@ -619,15 +493,16 @@ bool MeshNode::OriginateMessage(const HGID inDestination, const std::vector<uint
 
     PeerChannel &theChannel = GetChannel(theMessage.mReceiver, GetHGID());
 
-    assert(theChannel.mState == eSetup2 || theChannel.mState == eReceipt2 || theChannel.mState == eReceipt1);
-
-   if (theChannel.mUnspentTokens < hops) {
+    //assert(theChannel.mState == eSetup2 || theChannel.mState == eReceipt2 || theChannel.mState == eReceipt1);
+    
+    if (theChannel.mUnspentTokens < hops) {
          _log << "!! insufficient funds, unspent tokens = " << theChannel.mUnspentTokens << " !!" << endl;
         return false;       
     }
 
-    theChannel.mUnspentTokens -= hops;
-    theChannel.mSpentTokens += hops;
+    //theChannel.mUnspentTokens -= hops;
+    //theChannel.mSpentTokens += hops;
+    theChannel.mPromisedTokens += hops;
     theChannel.mLastNonce += 1;
     theChannel.mState = (theMessage.mDestination == theMessage.mReceiver) ? eNegotiate2 : eNegotiate1;
     
@@ -667,8 +542,9 @@ void MeshNode::RelayMessage(const MeshMessage& inMessage)
 
     // receive payment from sender
     uint8_t received_tokens = (inMessage.mIncentive.mPrepaidTokens - inMessage.mIncentive.mRelayPath.size());
-    theSenderChannel.mUnspentTokens -= received_tokens;
-    theSenderChannel.mSpentTokens += received_tokens;
+    //theSenderChannel.mUnspentTokens -= received_tokens;
+    //theSenderChannel.mSpentTokens += received_tokens;
+    theSenderChannel.mPromisedTokens += received_tokens;
     theSenderChannel.mLastNonce += 1;
     theSenderChannel.mState = inMessage.mIncentive.mType;
 
@@ -680,8 +556,9 @@ void MeshNode::RelayMessage(const MeshMessage& inMessage)
     // pay next hop
     uint8_t spent_tokens = (inMessage.mIncentive.mPrepaidTokens - inMessage.mIncentive.mRelayPath.size()) - 1;
     PeerChannel &theChannel = GetChannel(next_hop, GetHGID());
-    theChannel.mUnspentTokens -= spent_tokens;
-    theChannel.mSpentTokens += spent_tokens;
+    //theChannel.mUnspentTokens -= spent_tokens;
+    //theChannel.mSpentTokens += spent_tokens;
+    theChannel.mPromisedTokens -= spent_tokens;
     theChannel.mLastNonce += 1;
     theChannel.mState = inMessage.mIncentive.mType;
     
@@ -732,6 +609,7 @@ void MeshNode::FundChannel(const MeshMessage& inMessage)
         theChannel.mProposingPeer = inMessage.mSender;
         theChannel.mUnspentTokens = COMMITTED_TOKENS; // always commit default amount when funding a channel
         theChannel.mSpentTokens = 0;
+        theChannel.mPromisedTokens = 0;
         theChannel.mLastNonce = 0;
         theChannel.mState = eSetup2;
         theChannel.mRefundSignature = inMessage.mIncentive.mSignature;
@@ -745,6 +623,20 @@ void MeshNode::FundChannel(const MeshMessage& inMessage)
     }
 }
 
+bool MeshNode::VerifySetupTransaction(const MeshMessage& inMessage)
+{
+    std::vector<ImpliedTransaction> theTransactions = GetTransactions(inMessage);
+    if (!VerifyMessage(inMessage)) {
+        return false;
+    }
+
+    // get public key of Setup transaction
+    assert(theTransactions[1].GetType() == eSetup);
+    Ledger::sInstance.Add(theTransactions);
+    bool valid_setup = Ledger::sInstance.Unspent(theTransactions[1].GetHash());
+    return valid_setup;
+}
+
 // receive message
 void MeshNode::ReceiveMessage(const MeshMessage& inMessage)
 {    
@@ -752,56 +644,43 @@ void MeshNode::ReceiveMessage(const MeshMessage& inMessage)
     _log << "ReceiveMessage: " << inMessage << endl;
 
     // confirm setup transaction on the blockchain if channel needed to relay or originate a message
-    PeerChannel &theSenderChannel = GetChannel(GetHGID(), inMessage.mSender);
-    if (theSenderChannel.mConfirmed == false && inMessage.mIncentive.mType != eSetup1) {
+    PeerChannel &upstream_channel = GetChannel(GetHGID(), inMessage.mSender);
+    if (upstream_channel.mConfirmed == false && inMessage.mIncentive.mType != eSetup1) {
         HGID gateway;
         if (!GetNearestGateway(gateway)) {
             _log << "!! No route to gateway !! " << endl;    
         }
         else {
-            theSenderChannel.mConfirmed = ConfirmSetupTransaction(inMessage, gateway);
+            upstream_channel.mConfirmed = ConfirmSetupTransaction(inMessage, gateway);
         }
     }
 
-    // receive remaining tokens from sender
-    uint8_t remaining_tokens = (inMessage.mIncentive.mPrepaidTokens - inMessage.mIncentive.mRelayPath.size());
-    theSenderChannel.mUnspentTokens -= remaining_tokens;
-    theSenderChannel.mSpentTokens += remaining_tokens;
-    theSenderChannel.mLastNonce += 1;
-    theSenderChannel.mState = inMessage.mIncentive.mType;
-
     // channel for sending return receipt
-    PeerChannel& theReturnChannel = GetChannel(inMessage.mSender, GetHGID());
-    theReturnChannel.mLastNonce += 1;
-    theReturnChannel.mState = eReceipt1;
+    PeerChannel& downstream_channel = GetChannel(inMessage.mSender, GetHGID());
  
     // save a local copy of the payload hash for confirming receipt2 messages
     if (!inMessage.mIncentive.mWitness) {
-        SavePayloadHash(theReturnChannel, inMessage.mPayloadData);
+        SavePayloadHash(downstream_channel, inMessage.mPayloadData);
     }
     else {
-        SaveWitnessHash(theReturnChannel, inMessage.mPayloadData);
+        SaveWitnessHash(downstream_channel, inMessage.mPayloadData);
     }
     
     // message received and marked for signing witness node ? 
     if (inMessage.mIncentive.mWitness) {
+
         // verify the setup transaction on the blockchain
         MeshMessage witness_message;
         witness_message.FromBytes(inMessage.mPayloadData);
-        std::vector<ImpliedTransaction> theTransactions = GetTransactions(witness_message);
-        if (!VerifyMessage(witness_message)) {
-            assert(0);
-            return;
+        bool valid_setup = VerifySetupTransaction(witness_message);
+        if(valid_setup) {
+            _log << "Node " << std::setw(4) << std::setfill('0') << inMessage.mReceiver << ": setup transaction CONFIRMED:" << endl << "\t" << witness_message << endl;
+            cout << "Node " << std::setw(4) << std::setfill('0') << inMessage.mReceiver << ": setup transaction CONFIRMED:" << endl << "\t" << witness_message << endl;
         }
-
-        _log << "Node " << std::setw(4) << std::setfill('0') << inMessage.mReceiver << ": confirmed setup transaction:" << endl << "\t" << witness_message << endl;
-        cout << "Node " << std::setw(4) << std::setfill('0') << inMessage.mReceiver << ": confirmed setup transaction:" << endl << "\t" << witness_message << endl;
-
-        // get public key of Setup transaction
-        assert(theTransactions[2].GetType() == eSetup);
-        bls::PublicKey pk = theTransactions[1].GetSigner();
-        // TODO: check that the setup tx signer has the required balance
-        // TODO: commit the transaction chain to the blockchain
+        else {
+            _log << "Node " << std::setw(4) << std::setfill('0') << inMessage.mReceiver << ": setup transaction FAILED:" << endl << "\t" << witness_message << endl;
+            cout << "Node " << std::setw(4) << std::setfill('0') << inMessage.mReceiver << ": setup transaction FAILED:" << endl << "\t" << witness_message << endl;
+        }
     }
     else {
         std::string payload_text(reinterpret_cast<const char*>(inMessage.mPayloadData.data()), inMessage.mPayloadData.size());
@@ -823,6 +702,15 @@ void MeshNode::ReceiveMessage(const MeshMessage& inMessage)
 
     // send proof of receipt to previous hop
     SendTransmission(theMessage);
+
+    // !! update channel state(s) AFTER sending transmission because Verify() looks at current nodes channel state
+
+    // receive remaining tokens from sender
+    uint8_t remaining_tokens = (inMessage.mIncentive.mPrepaidTokens - inMessage.mIncentive.mRelayPath.size());
+    upstream_channel.mUnspentTokens -= remaining_tokens;
+    upstream_channel.mSpentTokens += remaining_tokens;
+    upstream_channel.mLastNonce += 1;
+    upstream_channel.mState = inMessage.mIncentive.mType;
 }
 
 // receive delivery receipt
@@ -833,31 +721,18 @@ void MeshNode::RelayDeliveryReceipt(const MeshMessage& inMessage)
 
     // destination node confirms message hash matches
     if (!VerifyMessage(inMessage)) {
-        _log << "\tVerifyMessage, failed!" << endl;
         return;
     }
-
-    // TODO: process confirmed payment
-    PeerChannel& theChannel = GetChannel(inMessage.mSender, GetHGID());
-
-    // TODO: should update channel with payment here, when confirmed, not when relayed
-    // auto pos = std::find(inMessage.mIncentive.mRelayPath.begin(), inMessage.mIncentive.mRelayPath.end(), GetHGID());
-    // uint8_t earned_tokens = PREPAID_TOKENS - std::distance(inMessage.mIncentive.mRelayPath.begin(), pos);
-    // theChannel.mUnspentTokens -= earned_tokens;
-    // theChannel.mSpentTokens += earned_tokens;
-    // theChannel.mLastNonce += 1;
-    theChannel.mState = eReceipt2;    
 
     if (GetHGID() != inMessage.mSource) {
         // relay return receipt
         MeshMessage theMessage = inMessage;
         theMessage.mSender = GetHGID();
 
-
         // determine next hop from the relay path, no searching
         // theMessage.mReceiver = GetNextHop(GetHGID(), inMessage.mSource);
-        ptrdiff_t pos = (std::find(theMessage.mIncentive.mRelayPath.begin(), 
-            theMessage.mIncentive.mRelayPath.end(), GetHGID()) - theMessage.mIncentive.mRelayPath.begin());
+        auto pos_iter = std::find(inMessage.mIncentive.mRelayPath.begin(), inMessage.mIncentive.mRelayPath.end(), GetHGID());
+        ptrdiff_t pos = std::distance(inMessage.mIncentive.mRelayPath.begin(), pos_iter);
         HGID theNextHop = (pos > 0 ? theMessage.mIncentive.mRelayPath[pos-1] : inMessage.mSource);
         _log << "Next Hop (relay path): " << std::hex << GetHGID() << " -> " << std::hex << inMessage.mSource << " = " << std::hex << theNextHop << endl;
         theMessage.mReceiver = theNextHop;
@@ -874,14 +749,47 @@ void MeshNode::RelayDeliveryReceipt(const MeshMessage& inMessage)
 
         // send proof of receipt to previous hop
         SendTransmission(theMessage);
-    }
-    else if (inMessage.mIncentive.mWitness) {
-        _log << "Confirmation of channel setup received by relay " << std::setw(4) << std::setfill('0') << inMessage.mSource << " from Witness Node " << std::setw(4) << std::setfill('0') << inMessage.mDestination << "!" << endl;
-        cout << "Confirmation of channel setup received by relay " << std::setw(4) << std::setfill('0') << inMessage.mSource << " from Witness Node " << std::setw(4) << std::setfill('0') << inMessage.mDestination << "!" << endl;
+
+        // !! update channel state(s) AFTER sending transmission because Verify() looks at current nodes channel state
+
+        uint8_t prepaid_tokens = inMessage.mIncentive.mPrepaidTokens;
+
+        // credit payment from upstream node and update nonce
+        assert (GetHGID() != theMessage.mSource);
+        uint8_t received_tokens = prepaid_tokens - pos;
+        PeerChannel& upstream_channel = GetChannel(GetHGID(), theNextHop);
+        upstream_channel.mUnspentTokens -= received_tokens;
+        upstream_channel.mSpentTokens += received_tokens;
+        upstream_channel.mPromisedTokens -= received_tokens;
+        upstream_channel.mLastNonce += 1;
+        upstream_channel.mState = eReceipt2;
+        
+        //  credit payment to downstream node from this node
+        assert (GetHGID() != theMessage.mDestination);
+        uint8_t spent_tokens = received_tokens - 1;
+        PeerChannel& downstream_channel = GetChannel(inMessage.mSender, GetHGID());
+        downstream_channel.mUnspentTokens -= spent_tokens;
+        downstream_channel.mSpentTokens += spent_tokens;
+        downstream_channel.mPromisedTokens -= spent_tokens;
+        downstream_channel.mLastNonce += 1;
+        downstream_channel.mState = eReceipt2;
     }
     else {
-        _log << "Delivery Receipt received by source " << std::setw(4) << std::setfill('0') << inMessage.mSource << " from message destination " << std::setw(4) << std::setfill('0') << inMessage.mDestination << "!" << endl;
-        cout << "Delivery Receipt received by source " << std::setw(4) << std::setfill('0') << inMessage.mSource << " from message destination " << std::setw(4) << std::setfill('0') << inMessage.mDestination << "!" << endl;
+        if (inMessage.mIncentive.mWitness) {
+            _log << "Confirmation of channel setup received by relay " << std::setw(4) << std::setfill('0') << inMessage.mSource << " from Witness Node " << std::setw(4) << std::setfill('0') << inMessage.mDestination << "!" << endl;
+            cout << "Confirmation of channel setup received by relay " << std::setw(4) << std::setfill('0') << inMessage.mSource << " from Witness Node " << std::setw(4) << std::setfill('0') << inMessage.mDestination << "!" << endl;
+        }
+        else {
+            _log << "Delivery Receipt received by source " << std::setw(4) << std::setfill('0') << inMessage.mSource << " from message destination " << std::setw(4) << std::setfill('0') << inMessage.mDestination << "!" << endl;
+            cout << "Delivery Receipt received by source " << std::setw(4) << std::setfill('0') << inMessage.mSource << " from message destination " << std::setw(4) << std::setfill('0') << inMessage.mDestination << "!" << endl;
+        }
+
+        // credit payment to first hop from message originator or witness requester
+        uint8_t prepaid_tokens = inMessage.mIncentive.mPrepaidTokens;
+        PeerChannel& downstream_channel = GetChannel(inMessage.mSender, GetHGID());
+        downstream_channel.mUnspentTokens -= prepaid_tokens;
+        downstream_channel.mSpentTokens += prepaid_tokens;
+        downstream_channel.mPromisedTokens -= prepaid_tokens;
     }
 }
 
@@ -892,13 +800,20 @@ bool MeshNode::ConfirmSetupTransaction(const MeshMessage& inMessage, const HGID 
     _log << "ConfirmSetupTransaction, Gateway: " << inGateway << ", Message Hash: [" << inMessage << "]" << endl << endl;
 
     if (GetHGID() == inGateway) {
-        // TODO: handle special case when relaying through a gateway
+        // handle special case of confirming transactions when relaying through a gateway
+        bool valid_setup = VerifySetupTransaction(inMessage);
+        if(valid_setup) {
+            _log << "Node " << std::setw(4) << std::setfill('0') << inMessage.mReceiver << ": setup transaction CONFIRMED:" << endl << "\t" << inMessage << endl;
+            cout << "Node " << std::setw(4) << std::setfill('0') << inMessage.mReceiver << ": setup transaction CONFIRMED:" << endl << "\t" << inMessage << endl;
+        }
+        else {
+            _log << "Node " << std::setw(4) << std::setfill('0') << inMessage.mReceiver << ": setup transaction FAILED:" << endl << "\t" << inMessage << endl;
+            cout << "Node " << std::setw(4) << std::setfill('0') << inMessage.mReceiver << ": setup transaction FAILED:" << endl << "\t" << inMessage << endl;
+        }
         PeerChannel& theSenderChannel = GetChannel(inMessage.mSender, GetHGID());
-        theSenderChannel.mConfirmed = true;
-        return true;
+        theSenderChannel.mConfirmed = valid_setup;
+        return valid_setup;
     }
-
-
 
     HGID next_hop;
     int hops;
@@ -917,15 +832,16 @@ bool MeshNode::ConfirmSetupTransaction(const MeshMessage& inMessage, const HGID 
 
     PeerChannel& theChannel = GetChannel(theMessage.mReceiver, GetHGID());
 
-    assert(theChannel.mState == eSetup2 || theChannel.mState == eReceipt2 || theChannel.mState == eReceipt1);
+    // assert(theChannel.mState == eSetup2 || theChannel.mState == eReceipt2 || theChannel.mState == eReceipt1);
 
     if (theChannel.mUnspentTokens < hops) {
          _log << "!! insufficient funds, unspent tokens = " << theChannel.mUnspentTokens << " !!" << endl;
         return false;       
     }
 
-    theChannel.mUnspentTokens -= hops;
-    theChannel.mSpentTokens += hops;
+    //theChannel.mUnspentTokens -= hops;
+    //theChannel.mSpentTokens += hops;
+    theChannel.mPromisedTokens += hops;
     theChannel.mLastNonce += 1;
     theChannel.mState = (theMessage.mDestination == theMessage.mReceiver ? eNegotiate2 : eNegotiate1);
     
@@ -948,7 +864,7 @@ bool MeshNode::ConfirmSetupTransaction(const MeshMessage& inMessage, const HGID 
 }
 
 
-bls::Signature MeshNode::GetAggregateSignature(const MeshMessage& inMessage, const bool isSigning)
+bls::Signature MeshNode::GetAggregateSignature(const MeshMessage& inMessage, const bool isSigning) const
 {
     const MeshNode& theSigningNode = MeshNode::FromHGID(inMessage.mSender);
 
@@ -958,31 +874,44 @@ bls::Signature MeshNode::GetAggregateSignature(const MeshMessage& inMessage, con
     // calculate aggregation info from implied transaction hashes and signing public keys  
     std::vector<ImpliedTransaction> theImpliedTransactions = GetTransactions(inMessage);
     vector<bls::Signature> sigs;
-    std::vector<bls::AggregationInfo> aggregation_info;
+
+    std::deque< std::deque<bls::AggregationInfo> > aggregation_queue(1);
     bls::PublicKey sender_pk = MeshNode::FromHGID(inMessage.mSender).GetPublicKey();
     bool isOtherSigner = !isSigning;
     bool isSkip = inMessage.mIncentive.mType < eReceipt1;
+    bool isSenderSigned = false;
+    ImpliedTransaction previous_aggregated_tx;
     for (auto tx = theImpliedTransactions.rbegin(); tx != theImpliedTransactions.rend(); tx++) {
         bls::PublicKey tx_signer_pk = tx->GetSigner();
         
-        isSkip &= (tx_signer_pk != sender_pk);
+        isSkip &= (tx_signer_pk != sender_pk && !isSenderSigned);
 
         if (!isSkip) {
             // only add aggregation_info for previously aggregated signatures
-            isOtherSigner |= tx_signer_pk != theSigningNode.GetPublicKey();
+            isOtherSigner |= tx_signer_pk != theSigningNode.GetPublicKey() || tx->GetType() == eRefund;
 
             if (isOtherSigner) {
-                aggregation_info.push_back( bls::AggregationInfo::FromMsgHash(tx_signer_pk, tx->GetTransactionHash().data()) );
+                if (!aggregation_queue.empty() && tx->GetSigner() != previous_aggregated_tx.GetSigner()) {
+                    // group current aggregation information when signer changes
+                    aggregation_queue.push_front(std::deque<bls::AggregationInfo>());
+                    _log << "\t---------- " << endl;
+                }
+                aggregation_queue.front().push_front( bls::AggregationInfo::FromMsgHash(tx_signer_pk, tx->GetHash().data()) );
+                previous_aggregated_tx = *tx;
             }
             else {
                 // push current signature contained in the message
-                sigs.push_back( theSigningNode.SignTransaction(*tx) );
+                sigs.insert( sigs.begin(), theSigningNode.SignTransaction(*tx) );
             }
         }
+
+        // after sender has signed their transactions, skip any later transactions signed by other nodes
+        isSenderSigned |= (tx_signer_pk == theSigningNode.GetPublicKey());
+
         _log << "\tSigner: " << MeshNode::FromPublicKey(tx_signer_pk).GetHGID() << " Type: " << tx->GetType() << (isSkip ? "- " : (isOtherSigner ? "* " : " "));
-        _log << " tx: [";
-        for (int v: tx->GetTransactionHash()) { _log << std::hex << v; }
-        _log << "] ";
+        _log << "\t tx: [";
+        for (int v: tx->GetHash()) { _log << std::setfill('0') << setw(2) << std::hex << v; }
+        _log << "\t] ";
         _log << endl;
     }
 
@@ -1012,15 +941,25 @@ bls::Signature MeshNode::GetAggregateSignature(const MeshMessage& inMessage, con
         _log << "] ";
         _log << endl;
 
-        aggregation_info.push_back( bls::AggregationInfo::FromMsgHash(pk, hash.data()) );
-    }    
+        aggregation_queue.back().push_back( bls::AggregationInfo::FromMsgHash(pk, hash.data()));
+    }
 
     _log << endl;
 
-    bls::AggregationInfo merged_aggregation_info = bls::AggregationInfo::MergeInfos(aggregation_info);
+    // combine and group aggregation info in the same way as when the original signature was created
+    bls::AggregationInfo merged_aggregation_info = bls::AggregationInfo::MergeInfos({aggregation_queue.front().begin(), aggregation_queue.front().end()});
+    aggregation_queue.pop_front();
+    while (aggregation_queue.begin() != aggregation_queue.end()) {
+        vector<bls::AggregationInfo> tmp_agg_info = { merged_aggregation_info };
+        tmp_agg_info.insert(tmp_agg_info.end(), aggregation_queue.front().begin(), aggregation_queue.front().end());
+        merged_aggregation_info = bls::AggregationInfo::MergeInfos(tmp_agg_info);
+        aggregation_queue.pop_front();
+    }
+    
+    // add aggregate signature from previous transactions
     bls::Signature agg_sig = bls::Signature::FromBytes(inMessage.mIncentive.mSignature.data());
     agg_sig.SetAggregationInfo(merged_aggregation_info);
-    sigs.push_back(agg_sig);
+    sigs.insert(sigs.begin(), agg_sig);
 
     // message receiver signs the payload data
     if (inMessage.mIncentive.mType == eReceipt1 && isSigning) {
@@ -1035,7 +974,9 @@ bls::Signature MeshNode::GetAggregateSignature(const MeshMessage& inMessage, con
     }
     catch (std::string &e) {
         _log << e << endl;
-    }    
+    }
+
+    _log << "sig = " << agg_sig << endl;
 
     return agg_sig;
 }
@@ -1065,18 +1006,21 @@ std::vector<ImpliedTransaction> MeshNode::GetTransactions(const MeshMessage& inM
 
     bls::Util::Hash256(&message_hash[0], reinterpret_cast<const uint8_t*>(inMessage.mPayloadData.data()), inMessage.mPayloadData.size());
 
-    ImpliedTransaction issued_value_tx = ImpliedTransaction::Issue(source.GetPublicKey(), 255);
+    // TODO: find a unique unspent output for this channel instead of using a default UTXO based on senders public key
+    ImpliedTransaction issued_value_tx = ImpliedTransaction::Issue(source.GetPublicKey(), COMMITTED_TOKENS);
     ImpliedTransaction setup_tx = ImpliedTransaction::Setup(issued_value_tx, source.GetPublicKey(), first_relay.GetPublicKey(), COMMITTED_TOKENS);
 
     _log << "GetTransactions, Type: " << incentive.mType << endl;
 
     if (incentive.mType >= eSetup1) {
-        // create refund tx, first relay signs and then source signs
+        // create refund tx, first relay signs and source signs only if first negotiate fails
         theTransactions.push_back( ImpliedTransaction::Refund(setup_tx, source.GetPublicKey(), first_relay.GetPublicKey(), first_relay.GetPublicKey(), COMMITTED_TOKENS) );
     }
     if (incentive.mType >= eSetup2) {
+        // TODO: sender only adds second signature for refund if first negotiate transaction fails
+        // theTransactions.push_back( ImpliedTransaction::Refund(setup_tx, source.GetPublicKey(), first_relay.GetPublicKey(), source.GetPublicKey(), COMMITTED_TOKENS) );
+        
         // create funding tx
-        theTransactions.push_back( ImpliedTransaction::Refund(setup_tx, source.GetPublicKey(), first_relay.GetPublicKey(), source.GetPublicKey(), COMMITTED_TOKENS) );
         theTransactions.push_back( setup_tx );
     }
     if (incentive.mType >= eNegotiate1) {       
@@ -1092,12 +1036,20 @@ std::vector<ImpliedTransaction> MeshNode::GetTransactions(const MeshMessage& inM
         for (auto hgid2 = path.begin(); hgid2 != path.end(); ++hgid2) {
             const MeshNode& sender = MeshNode::FromHGID(hgid1);
             const MeshNode& receiver = MeshNode::FromHGID(*hgid2);
+
+            // determine current balance between nodes
+            const PeerChannel &theChannel = sender.GetChannel(sender.GetHGID(), receiver.GetHGID());
+            
             // create update and settle tx, sender signs and then receiver signs
-            theTransactions.push_back( ImpliedTransaction::UpdateAndSettle(last_update_tx, sender.GetPublicKey(), receiver.GetPublicKey(), sender.GetPublicKey(), prepaid_tokens, prepaid_tokens-1, destination.GetPublicKey(), message_hash));
-            theTransactions.push_back( ImpliedTransaction::UpdateAndSettle(last_update_tx, sender.GetPublicKey(), receiver.GetPublicKey(), receiver.GetPublicKey(), prepaid_tokens, prepaid_tokens-1, destination.GetPublicKey(), message_hash));
+            theTransactions.push_back( ImpliedTransaction::UpdateAndSettle(last_update_tx, sender.GetPublicKey(), receiver.GetPublicKey(), sender.GetPublicKey(), 
+                theChannel.mUnspentTokens - prepaid_tokens, theChannel.mSpentTokens + prepaid_tokens, destination.GetPublicKey(), message_hash));
+
+            // TODO: receiver should only adds the second signature to the state update if they want to checkpoint the update on the blockchain 
+            theTransactions.push_back( ImpliedTransaction::UpdateAndSettle(last_update_tx, sender.GetPublicKey(), receiver.GetPublicKey(), receiver.GetPublicKey(), 
+                theChannel.mUnspentTokens - prepaid_tokens, theChannel.mSpentTokens + prepaid_tokens, destination.GetPublicKey(), message_hash));
             
             _log << endl << "\t\t public key: " << sender.GetPublicKey() << ", tokens: " << (int) prepaid_tokens << ", sender:" << sender.GetHGID() << ", receiver:" << receiver.GetHGID() << " tx: [";
-            for (int v: theTransactions.back().GetTransactionHash()) { _log << std::hex << v; }
+            for (int v: theTransactions.back().GetHash()) { _log << std::setfill('0') << setw(2) << std::hex << v; }
             _log << "] " << endl;
 
             hgid1 = *hgid2;
@@ -1111,9 +1063,15 @@ std::vector<ImpliedTransaction> MeshNode::GetTransactions(const MeshMessage& inM
         HGID penultimate_node = incentive.mRelayPath.empty() ? inMessage.mSource : incentive.mRelayPath.back();
         const MeshNode& sender = MeshNode::FromHGID(penultimate_node);
         const MeshNode& receiver = MeshNode::FromHGID(inMessage.mDestination);
+
+        // determine current balance between nodes
+        const PeerChannel &theChannel = sender.GetChannel(receiver.GetHGID(), sender.GetHGID());
+
         // create update and settle tx for delivery to destination node, sender signs and then destination signs
-        theTransactions.push_back( ImpliedTransaction::UpdateAndSettle(theTransactions.back(), sender.GetPublicKey(), receiver.GetPublicKey(), sender.GetPublicKey(), prepaid_tokens, prepaid_tokens-1, destination.GetPublicKey(), message_hash));
-        theTransactions.push_back( ImpliedTransaction::UpdateAndSettle(theTransactions.back(), sender.GetPublicKey(), receiver.GetPublicKey(), destination.GetPublicKey(), prepaid_tokens, prepaid_tokens-1, destination.GetPublicKey(), message_hash));
+        theTransactions.push_back( ImpliedTransaction::UpdateAndSettle(theTransactions.back(), sender.GetPublicKey(), receiver.GetPublicKey(), sender.GetPublicKey(), 
+            theChannel.mUnspentTokens - prepaid_tokens, theChannel.mSpentTokens + prepaid_tokens, destination.GetPublicKey(), message_hash));
+        theTransactions.push_back( ImpliedTransaction::UpdateAndSettle(theTransactions.back(), sender.GetPublicKey(), receiver.GetPublicKey(), destination.GetPublicKey(), 
+            theChannel.mUnspentTokens - prepaid_tokens, theChannel.mSpentTokens + prepaid_tokens, destination.GetPublicKey(), message_hash));
     }
     
     return theTransactions;
@@ -1136,14 +1094,18 @@ void MeshNode::UpdateIncentiveHeader(MeshMessage& ioMessage)
         throw std::invalid_argument("invalid MeshMessage: L49Header is missing an aggregate signature");
     }    
     
-    if ((theChannel.mState == eNegotiate1 || theChannel.mState == eNegotiate2) && ioMessage.mSender != ioMessage.mSource)
+    if ((theChannel.mState == eNegotiate1 || theChannel.mState == eNegotiate2) && ioMessage.mSender != ioMessage.mSource) 
     {
         // add relay node to path
         incentive.mRelayPath.push_back(ioMessage.mSender);
     }
 
     std::vector<ImpliedTransaction> theImpliedTransactions = GetTransactions(ioMessage);
-    bls::Signature agg_sig = GetAggregateSignature(ioMessage, true);    
+    bls::Signature agg_sig = GetAggregateSignature(ioMessage, true);
+    
+    if (!agg_sig.Verify()) {
+        return;
+    }     
 
     agg_sig.Serialize(&incentive.mSignature[0]);
 }
@@ -1152,16 +1114,19 @@ void MeshNode::UpdateIncentiveHeader(MeshMessage& ioMessage)
 bls::Signature MeshNode::SignTransaction(const ImpliedTransaction& inTransaction) const
 {
     _log << "Node " << GetHGID() << ", ";
-    _log << "SignTransaction, Tx Type: " << inTransaction.GetType() << " tx: [";
-    for (int v: inTransaction.GetTransactionHash()) { _log << std::hex << v; } 
+    _log << "SignTransaction, Tx Type: " << inTransaction.GetType() << " tx data: [";
+    for (int v: inTransaction.Serialize()) { _log << std::setfill('0') << setw(2) << std::hex << v; } 
+    _log << "]" << endl;
+    _log << " tx hash: [";
+    for (int v: inTransaction.GetHash()) { _log << std::setfill('0') << setw(2) << std::hex << v; } 
     _log << "]" << endl;
     _log << "\tTx Signer PK: ";
     _log << inTransaction.GetSigner();
     _log << endl;
  
+    // TODO: use inTransaction.GetHash() or inTransaction.Serialize(); ?
     std::vector<uint8_t> msg = inTransaction.Serialize();
     bls::PrivateKey sk = bls::PrivateKey::FromSeed(mSeed.data(), mSeed.size());
-    bls::PublicKey pk = sk.GetPublicKey();
     bls::Signature sig = sk.Sign(msg.data(), msg.size());
 
     //_log << "\tSignature: " << sig << endl;
@@ -1204,7 +1169,6 @@ void MeshNode::SendTransmission(const MeshMessage& inMessage)
     _log << "\tDistance = " << tx_distance << " meters" << endl;
     
     if (!VerifyMessage(inMessage)) {
-        // _log << "\tVerifyMessage, failed!" << endl;
         return;
     }
     MeshNode& receiver = MeshNode::FromHGID(inMessage.mReceiver);
@@ -1219,9 +1183,7 @@ void MeshNode::ReceiveTransmission(const MeshMessage &inMessage)
     MeshMessage theMessage = inMessage;
 
     // check that aggregate signature is valid
-    MeshNode& sender = MeshNode::FromHGID(inMessage.mSender);
     if (!VerifyMessage(inMessage)) {
-        _log << "\tVerifyMessage, failed!" << endl;
         return;
     }
 
@@ -1252,13 +1214,14 @@ void MeshNode::ReceiveTransmission(const MeshMessage &inMessage)
 }
 
 // check that aggregate signature is valid
-bool MeshNode::VerifyMessage(const MeshMessage& inMessage) 
+bool MeshNode::VerifyMessage(const MeshMessage& inMessage) const
 {
     _log << "Node " << GetHGID() << ", ";
     _log << "VerifyMessage: " << inMessage << endl;
 
     bls::Signature agg_sig = GetAggregateSignature(inMessage, false);
     if (!agg_sig.Verify()) {
+        _log << "Verify Failed!" << endl;
         assert(0);
         return false;
     } 
@@ -1433,17 +1396,6 @@ void MeshNode::ChannelsBalances(int& outInChannels, int& outInBalance, int& outO
     }
 }
 
-static std::ofstream sTopology;
-std::ofstream& TOPOLOGY() {
-    if (!sTopology.is_open()) {
-        std::string filename = MeshNode::sParametersString + "lot49_topology.csv";
-        sTopology.open(filename);
-        sTopology << "time, node, correspondent, distance, current_x, current_y, paused, next_node, in_channels, out_channels, received_tokens, spent_tokens" << endl;
-    }
-    return sTopology;
-};
-#define _topology TOPOLOGY()
-
 void MeshNode::PrintTopology() 
 {
     for (auto& node1 : sNodes) {
@@ -1465,7 +1417,8 @@ void MeshNode::PrintTopology()
         int in_channels, received_tokens, out_channels, spent_tokens;
         node1.ChannelsBalances(in_channels, received_tokens, out_channels, spent_tokens);
         _topology << std::dec << in_channels << ", " << std::dec << out_channels << ", ";
-        _topology << std::dec << received_tokens << ", " << std::dec << spent_tokens << endl;        
+        _topology << std::dec << received_tokens << ", " << std::dec << spent_tokens << ", ";
+        _topology << std::dec << received_tokens - spent_tokens << endl;        
     }
     
     /*
@@ -1487,13 +1440,6 @@ void MeshNode::PrintTopology()
         }
     }
     */
-}
-
-void MeshNode::CloseLogs()
-{
-    sLogfile.close();
-    sStatsfile.close();
-    sTopology.close();
 }
 
 // update position of all nodes, update routes and send messages

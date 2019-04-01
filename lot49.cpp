@@ -1,5 +1,8 @@
 #include "bls.hpp"
 #include "MeshNode.hpp"
+#include "Ledger.hpp"
+#include "ImpliedTransaction.hpp"
+#include "Utils.hpp"
 #include <algorithm>
 
 using namespace std;
@@ -11,6 +14,7 @@ bool testBLS();
 
 void test1();
 void test2();
+void test3();
 
 void TestRoute(HGID inSender, HGID inReceiver, std::string& inMessage)
 {
@@ -26,11 +30,161 @@ int main(int argc, char* argv[])
     cout << "testBLS():  " << (testBLS() ? "success!" : "failed!") << endl;
 
     // test with pre-defined paths
-    // test1();
+    //test1();
 
     // test randomly moving nodes
     test2();
+
+    // test aggregation of specific keys and messages
+    //test3();
 };
+
+// test aggregation of specific keys and messages
+void test3()
+{  
+    int s1 = 7;
+    int s2 = 1;
+
+
+    std::vector<uint8_t> seed1(32, s1);
+    std::vector<uint8_t> seed2(32, s2);
+
+    bls::PrivateKey sk1 = bls::PrivateKey::FromSeed(seed1.data(), seed1.size());
+    cout << "sk" << s1 << " = " << std::hex;
+    for (auto byte : seed1 ) { cout << std::setw(2) << std::setfill('0') << static_cast<int>(byte);} 
+    cout << endl;
+    bls::PublicKey pk1 = sk1.GetPublicKey();
+    cout << "pk" << s1 << " = " << std::hex << pk1 << endl;
+
+    bls::PrivateKey sk2 = bls::PrivateKey::FromSeed(seed2.data(), seed2.size());
+    cout << "sk" << s2 << " = " << std::hex;
+    for (auto byte : seed2 ) { cout << std::setw(2) << std::setfill('0') << static_cast<int>(byte);} 
+    cout << endl;
+    bls::PublicKey pk2 = sk2.GetPublicKey();
+    cout << "pk" << s2 << " = " << std::hex << pk2 << endl;
+
+    std::vector<uint8_t> refund_tx = lot49::HexToBytes("0304c9dac5dd96896276e531c2e86c8fa704c4a2996c23b146fcb48d08d6d3ae48728b29d9fdead8b3bab150cb7d58fbcd857958fe97f040075ef324bfd46a0d2031ea3c28fe8bda1ea2542cf4ffff3b2ca23ea8d216cf33881789fcd0ff9f7bc704c9dac5dd96896276e531c2e86c8fa704c4a2996c23b146fcb48d08d6d3ae48728b29d9fdead8b3bab150cb7d58fbcd000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000d000000007000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
+    std::vector<uint8_t> setup_tx = lot49::HexToBytes("0204c9dac5dd96896276e531c2e86c8fa704c4a2996c23b146fcb48d08d6d3ae48728b29d9fdead8b3bab150cb7d58fbcd00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004c9dac5dd96896276e531c2e86c8fa704c4a2996c23b146fcb48d08d6d3ae48728b29d9fdead8b3bab150cb7d58fbcd857958fe97f040075ef324bfd46a0d2031ea3c28fe8bda1ea2542cf4ffff3b2ca23ea8d216cf33881789fcd0ff9f7bc7d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
+    std::vector<uint8_t> update1_tx = lot49::HexToBytes("0404c9dac5dd96896276e531c2e86c8fa704c4a2996c23b146fcb48d08d6d3ae48728b29d9fdead8b3bab150cb7d58fbcd857958fe97f040075ef324bfd46a0d2031ea3c28fe8bda1ea2542cf4ffff3b2ca23ea8d216cf33881789fcd0ff9f7bc704c9dac5dd96896276e531c2e86c8fa704c4a2996c23b146fcb48d08d6d3ae48728b29d9fdead8b3bab150cb7d58fbcd857958fe97f040075ef324bfd46a0d2031ea3c28fe8bda1ea2542cf4ffff3b2ca23ea8d216cf33881789fcd0ff9f7bc7cd00030007018f62165173f9087a003c04de96bd3ef09cd84b7b7c53c4f77aa8870594dea08d41ab8fb1db7e48bdc4bae1dd6b1412700000000000000000000000000000000000000000000000000000000000000000");
+    std::vector<uint8_t> update2_tx = lot49::HexToBytes("04857958fe97f040075ef324bfd46a0d2031ea3c28fe8bda1ea2542cf4ffff3b2ca23ea8d216cf33881789fcd0ff9f7bc78f62165173f9087a003c04de96bd3ef09cd84b7b7c53c4f77aa8870594dea08d41ab8fb1db7e48bdc4bae1dd6b141270857958fe97f040075ef324bfd46a0d2031ea3c28fe8bda1ea2542cf4ffff3b2ca23ea8d216cf33881789fcd0ff9f7bc78f62165173f9087a003c04de96bd3ef09cd84b7b7c53c4f77aa8870594dea08d41ab8fb1db7e48bdc4bae1dd6b141270ce00020007028f62165173f9087a003c04de96bd3ef09cd84b7b7c53c4f77aa8870594dea08d41ab8fb1db7e48bdc4bae1dd6b1412700000000000000000000000000000000000000000000000000000000000000000");
+
+    // SUCCEED
+    std::vector<uint8_t> sig_refund_test = lot49::HexToBytes("038da3bdcdf4838137f88268e3bb532f873671d53ac19807e0806888e082df1e9f2d6ab6d632c94993a7db257c21a98509ceef38d5f195037a9fa2444979c6c03654d9f4a309dc159aa2a7c73f7f2be1f984c29755e45f2b288d32f08542b25b");
+
+    // SUCCEED
+    std::vector<uint8_t> sig_update1_test = lot49::HexToBytes("15ad5f8a75b0c3c18a6efbb298a6db788bc6049a2eab7d01454d03f50383f648935f045e3749da5296052ac43ff430aa05d66916f70a23eff3a5de65663e34f4e94cc42ae81909868b5d240ebbb01ac78ec2f2a068a586ab88a3139bd1d2f78b");
+
+    // FAIL?
+    std::vector<uint8_t> sig_update2_test = lot49::HexToBytes("99b850d5d360b0a6c61fa7ea909750546bf53b3acc78549d8804e709c9dd77ecdf23320c7f65de52d5e9303d0fd06a7602d90a3d19d45bfb6b59d9824db30e183bf2a797d2a1bee21c9fc80d53ca46d562a6ed281f33113f6fd8466ab5bf5b32");
+
+    std::vector<uint8_t> refund_hash(bls::BLS::MESSAGE_HASH_LEN);
+    bls::Util::Hash256(refund_hash.data(), reinterpret_cast<const uint8_t*>(refund_tx.data()), refund_tx.size());
+    std::vector<uint8_t> setup_hash(bls::BLS::MESSAGE_HASH_LEN);
+    bls::Util::Hash256(setup_hash.data(), reinterpret_cast<const uint8_t*>(setup_tx.data()), setup_tx.size());
+    std::vector<uint8_t> update1_hash(bls::BLS::MESSAGE_HASH_LEN);
+    bls::Util::Hash256(update1_hash.data(), reinterpret_cast<const uint8_t*>(update1_tx.data()), update1_tx.size());
+    std::vector<uint8_t> update2_hash(bls::BLS::MESSAGE_HASH_LEN);
+    bls::Util::Hash256(update2_hash.data(), reinterpret_cast<const uint8_t*>(update2_tx.data()), update2_tx.size());
+
+    // Create signatures
+    bls::Signature sig_refund_sk1 = sk1.Sign(refund_tx.data(), refund_tx.size());
+    bls::Signature sig_setup_sk2 = sk2.Sign(setup_tx.data(), setup_tx.size());
+    bls::Signature sig_update1_sk2 = sk2.Sign(update1_tx.data(), update1_tx.size());
+    bls::Signature sig_update1_sk1 = sk1.Sign(update1_tx.data(), update1_tx.size());
+    bls::Signature sig_update2_sk1 = sk1.Sign(update2_tx.data(), update2_tx.size());
+
+    cout << "sig_refund = " << std::hex << sig_refund_sk1 << endl << endl;
+    assert(sig_refund_sk1 == bls::Signature::FromBytes(sig_refund_test.data()));
+
+    // Create aggregate signature for update1 test
+    vector<bls::Signature> update1_sigs = {sig_refund_sk1, sig_setup_sk2, sig_update1_sk2};
+    {
+        cout << "update 1 test" << endl;
+        bls::Signature agg_sig = bls::Signature::AggregateSigs(update1_sigs);
+        cout << "agg_sig = " << std::hex << agg_sig << endl;
+        bool ok = agg_sig.Verify();
+        cout << "agg_sig.Verify() = " << (ok ? "true" : "false") << endl;
+        assert(agg_sig == bls::Signature::FromBytes(sig_update1_test.data()));
+        update1_sigs.clear();
+        update1_sigs.push_back(agg_sig);
+        cout << endl;
+    }
+
+    // Create aggregate signature for update1 test and added update2 signatures
+    {
+        cout << "update 1 + update 2 test" << endl;
+        bls::AggregationInfo a1 = bls::AggregationInfo::FromMsgHash(pk1, refund_hash.data());
+        bls::AggregationInfo a2 = bls::AggregationInfo::FromMsgHash(pk2, setup_hash.data());
+        bls::AggregationInfo a3 = bls::AggregationInfo::FromMsgHash(pk2, update1_hash.data());
+        vector<bls::AggregationInfo> infos = {a1, a2, a3};
+        bls::AggregationInfo agg_info = bls::AggregationInfo::MergeInfos(infos);
+        bls::Signature agg_sig = bls::Signature::FromBytes(update1_sigs.back().Serialize().data());
+        agg_sig.SetAggregationInfo(agg_info);
+        
+        cout << "agg_sig = " << std::hex << agg_sig << endl;
+        bool ok = agg_sig.Verify();
+        cout << "agg_sig.Verify() = " << (ok ? "true" : "false") << endl;
+        assert(agg_sig == bls::Signature::FromBytes(sig_update1_test.data()));
+        cout << endl;
+
+        std::vector<bls::Signature> sigs = {agg_sig, sig_update1_sk1, sig_update2_sk1};
+        agg_sig = bls::Signature::AggregateSigs(sigs);
+        cout << "agg_sig = " << std::hex << agg_sig << endl;
+        ok = agg_sig.Verify();
+        cout << "agg_sig.Verify() = " << (ok ? "true" : "false") << endl;
+        //assert(agg_sig == bls::Signature::FromBytes(sig_update2_test.data()));
+        cout << endl;
+    }
+
+    // Create aggreage signature for update2 test
+    vector<bls::Signature> update2_sigs;
+    {
+        cout << "update 2 test" << endl;
+        std::vector<bls::Signature> sigs = {sig_refund_sk1, sig_setup_sk2, sig_update1_sk2};
+        bls::Signature agg_sig = bls::Signature::AggregateSigs(sigs);
+        cout << "agg_sig = " << std::hex << agg_sig << endl;
+        cout << "agg_sig.Verify() = " << (agg_sig.Verify() ? "true" : "false") << endl;
+
+        sigs = {agg_sig, sig_update1_sk1, sig_update2_sk1};
+        agg_sig = bls::Signature::AggregateSigs(sigs);
+        cout << "agg_sig = " << std::hex << agg_sig << endl;
+        cout << "agg_sig.Verify() = " << (agg_sig.Verify() ? "true" : "false") << endl;
+        assert(agg_sig == bls::Signature::FromBytes(sig_update2_test.data()));
+        update2_sigs.push_back(agg_sig);
+        cout << endl;
+    }
+
+    // use aggregation information with deserialize sig for update 2
+    {
+        bls::AggregationInfo a1 = bls::AggregationInfo::FromMsgHash(pk1, refund_hash.data());
+        bls::AggregationInfo a2 = bls::AggregationInfo::FromMsgHash(pk2, setup_hash.data());
+        bls::AggregationInfo a3 = bls::AggregationInfo::FromMsgHash(pk2, update1_hash.data());
+        bls::AggregationInfo a4 = bls::AggregationInfo::FromMsgHash(pk1, update1_hash.data());
+        bls::AggregationInfo a5 = bls::AggregationInfo::FromMsgHash(pk1, update2_hash.data());
+        vector<bls::AggregationInfo> infos = {a1};
+        bls::AggregationInfo agg_info = bls::AggregationInfo::MergeInfos(infos);
+        infos = {agg_info, a2, a3};
+        agg_info = bls::AggregationInfo::MergeInfos(infos);
+        infos = {agg_info, a4, a5};
+        agg_info = bls::AggregationInfo::MergeInfos(infos);
+
+        // reconstruct signature from serialized data
+        cout << "update 2 test from serialized aggregate signature" << endl;
+        vector<bls::Signature> sigs = {sig_refund_sk1, sig_setup_sk2, sig_update1_sk2};
+        bls::Signature agg_sig = bls::Signature::AggregateSigs(sigs);
+        sigs = {agg_sig, sig_update1_sk1, sig_update2_sk1};
+        agg_sig = bls::Signature::AggregateSigs(sigs);
+        
+        // strip aggregation data
+        agg_sig = bls::Signature::FromBytes(agg_sig.Serialize().data());
+
+        // add reconstructed aggregation data
+        agg_sig.SetAggregationInfo(agg_info);
+        cout << "agg_sig = " << std::hex << agg_sig << endl;
+        cout << "agg_sig.Verify() = " << (agg_sig.Verify() ? "true" : "false") << endl;
+        assert(agg_sig == bls::Signature::FromBytes(sig_update2_test.data()));
+    }
+}
 
 // test randomly moving nodes
 void test2()
@@ -38,8 +192,9 @@ void test2()
     auto t = std::time(nullptr);
     auto tm = *std::localtime(&t);
     const size_t MAX_NODES = 30;
+    const size_t MAX_TIME = 480; // 8 hrs of simulation
     
-     std::vector<int> sides = {5477, 4472, 3873, 3464, 3162, 2928};
+     std::vector<int> sides =  {2928}; // {5477, 4472, 3873, 3464, 3162, 2928};
      for (auto side : sides) {
         std::ostringstream oss;
         oss << "results/";
@@ -49,10 +204,16 @@ void test2()
         MeshNode::sParametersString = oss.str();
         MeshNode::sMaxSize = side;
         MeshNode::CreateNodes(MAX_NODES);
-        for (int i = 0; i < 120; i++) {
+
+        for (int i = 0; i < MAX_NODES; i++) {
+            bls::PublicKey pk = MeshNode::FromIndex(i).GetPublicKey();
+            Ledger::sInstance.Issue(pk, COMMITTED_TOKENS, MAX_NODES);
+        }
+
+        for (int i = 0; i < MAX_TIME; i++) {
             MeshNode::UpdateSimulation();
         }
-        MeshNode::CloseLogs();
+        CloseLogs();
     }
 }
 
