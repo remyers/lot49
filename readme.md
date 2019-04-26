@@ -5,9 +5,9 @@ This project exists to explore and simulate ideas for a [Layer 2](https://en.wik
 ## Protocol Summary
 
 * Sender nodes source route message data (think SMS, not TCP/IP) to Destination nodes.
-* Sender nodes include a payment if routing via Relay nodes or Gateway nodes to the internet.
+* Sender nodes include a payment if routing via Relay nodes or internet Gateway nodes.
 * Nodes that relay data for a Sender collect a payment only if the Destination node receives the message data.
-* Payment transactions are verified and settled on a decentralized ledger by online Witness nodes.
+* Payment transactions are verified and settled on a decentralized ledger using online Witness nodes.
 
 ![Lot49 Network Overview](./doc/lot49_network_overview.svg?raw=true "Lot49 Network Overview")
 
@@ -50,7 +50,7 @@ This project exists to explore and simulate ideas for a [Layer 2](https://en.wik
 
 ## FAQ
 
-Q: Why not use Bitcoin to settle payment transactions?
+Q: Why not use the current Bitcoin network to settle payment transactions?
 
 Currently Bitcoin uses ECDSA signatures that can not be non-interactively aggregated like [BLS signatures](https://crypto.stanford.edu/~dabo/pubs/papers/aggreg.pdf) can. Bitcoin also does not support [SIGHASH_NOINPUT](https://github.com/bitcoin/bips/blob/master/bip-0118.mediawiki) which is required for the [eltoo](https://blockstream.com/eltoo.pdf) update scheme.
 
