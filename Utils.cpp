@@ -63,7 +63,7 @@ std::ostream &operator<<(std::ostream &out, const MeshNode &n)
 {
     out << "HGID: " << std::hex << std::setw(4) << std::setfill('0') << n.GetHGID() << std::endl;
     out << "\tptr = 0x" << std::hex << &n << std::endl;
-    out << "\tWitness: " << n.mWitnessNode << std::endl;
+    out << "\tPending Channel Node: " << n.mPendingChannelNode << std::endl;
     out << "\tGateway: " << (n.mIsGateway ? "true" : "false") << std::endl;
     out << "\tCorrespondent: " << n.mCorrespondent;
     out << " (distance = " << Distance(n.mCurrentPos, MeshNode::FromHGID(n.mCorrespondent).mCurrentPos) << ")" << std::endl;
@@ -99,23 +99,24 @@ std::ostream &operator<<(std::ostream &out, const L49Header &i)
 
 std::ostream &operator<<(std::ostream &out, const MeshMessage &m)
 {
-    out << "Message, Source: " << std::setw(2) << std::setfill('0') << m.mSource;
-    out << " Sender: " << std::setw(2) << std::setfill('0') << m.mSender;
-    out << " Receiver: " << std::setw(2) << std::setfill('0') << m.mReceiver;
-    out << " Destination: " << std::setw(2) << std::setfill('0') << m.mDestination;
+    out << "Message,  " << m.mIncentive.mType << ", Prepaid Tokens: " << (int) m.mIncentive.mPrepaidTokens << ", ";
+    out << std::setw(2) << std::setfill('0') << m.mSource << " >> ";
+    out << std::setw(2) << std::setfill('0') << m.mSender << " -> ";
+    out << std::setw(2) << std::setfill('0') << m.mReceiver << " >> ";
+    out << std::setw(2) << std::setfill('0') << m.mDestination << ".";
     if (m.mPayloadData.empty()) {
         out << " Payload: " << std::endl << "\t[]" << std::endl;
     }
     else if (m.mIncentive.mWitness) {
         MeshMessage witness_message;
         witness_message.FromBytes(m.mPayloadData);
-        out << " Payload: Witness: " << std::endl << "\t[" << witness_message << "]" << std::endl;
+        out << " Payload: Witness: " << std::endl << "\t\t[" << witness_message << "]" << std::endl;
     }
     else {
         std::string payload_text(reinterpret_cast<const char*>(m.mPayloadData.data()), m.mPayloadData.size());
-        out << " Payload: " << std::endl << "\t[" << payload_text << "]" << std::endl;
+        out << " Payload: " << std::endl << "\t\t[" << payload_text << "]" << std::endl;
     }
-    out << "\t" << m.mIncentive;
+    out << "\t\t" << m.mIncentive;
     return out;
 }
 

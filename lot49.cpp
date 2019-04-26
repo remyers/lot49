@@ -8,7 +8,7 @@
 using namespace std;
 using namespace lot49;
 
-// TODO: use  32 byte signatures, not 96 byte: https://twitter.com/sorgente711/status/1025451092610433024
+// TODO: use  48 byte signatures, not 96 byte: https://twitter.com/sorgente711/status/1025451092610433024
 
 bool testBLS();
 

@@ -145,9 +145,6 @@ class MeshNode
     // originate new message
     bool OriginateMessage(const HGID inDestination, const std::vector<uint8_t> &inPayload);
 
-    // set witness node
-    void SetWitnessNode(const HGID inHGID);
-
     // set/get correspondent node
     void SetCorrespondentNode(const HGID inHGID);
     HGID GetCorrespondentNode() const;
@@ -221,7 +218,7 @@ class MeshNode
     void RelayDeliveryReceipt(const MeshMessage& inMessage);
 
     // verify the setup transaction for a payment channel with a witness node (via inGateway)
-    bool ConfirmSetupTransaction(const MeshMessage& inMessage, const HGID inGateway);
+    void ConfirmSetupTransaction(const MeshMessage& inMessage, const HGID inGateway);
 
     void ChannelsBalances(int& outInChannels, int& outReceivedTokens, int& outOutChannels, int& outSpentTokens) const;
 
@@ -239,7 +236,8 @@ class MeshNode
     // state of the channel with a peer (receiving, next hop) node
     std::map<std::pair<HGID,HGID>, PeerChannel> mPeerChannels;
 
-    HGID mWitnessNode;
+    // nearby node with setup transaction pending witness node confirmation
+    HGID mPendingChannelNode;
 
     // used to create private key
     std::vector<uint8_t> mSeed;

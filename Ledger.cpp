@@ -100,6 +100,8 @@ bool Ledger::ValidTransfer(const ImpliedTransaction& inInput, const ImpliedTrans
 
 bool Ledger::Add(const std::vector<ImpliedTransaction>& inTransactions)
 {
+    _log << "Ledger::Add Transactions:" << endl << endl;
+
     //_log << "UTXOs:" << endl;
     //_log << "Transaction Id\tType\tSigner PK\tOutput Amount 1\tOutput Amount 2" << endl;
     //for (auto& tx_iter : mUTXOs) {
@@ -109,16 +111,16 @@ bool Ledger::Add(const std::vector<ImpliedTransaction>& inTransactions)
     // sort transactions in order of dependence
     std::vector<ImpliedTransaction> sorted_transations = Sort(inTransactions);
 
-    _log << "Sorted Transactions:" << endl;
-    _log << "Transaction Id\tType\tSigner PK\tOutput Amount 1\tOutput Amount 2" << endl;
+    _log << "\tSorted Transactions:" << endl;
+    _log << "\tTransaction Id\tType\tSigner PK\tOutput Amount 1\tOutput Amount 2" << endl;
     for (auto& tx_iter : sorted_transations) {
-        _log << std::hex << tx_iter.GetId() << "\t" << tx_iter.GetType() << "\t" << tx_iter.GetSigner() << "\t" << tx_iter.GetOutputAmount(0) << "\t" << tx_iter.GetOutputAmount(1) << endl;
+        _log << "\t" << std::hex << tx_iter.GetId() << "\t" << tx_iter.GetType() << "\t" << tx_iter.GetSigner() << "\t" << tx_iter.GetOutputAmount(0) << "\t" << tx_iter.GetOutputAmount(1) << endl;
     }
 
     // record which owners signed each new output transaction
     TransactionMap proposed_utxo;
 
-    _log << "Valid Transactions:" << endl;
+    _log << "\tValid Transactions:" << endl;
     for (const auto& tx : sorted_transations) {
         _log << std::hex << tx.GetId() << "\t" << tx.GetType() << "\t" << tx.GetSigner() << "\t" << tx.GetOutputAmount(0) << "\t" << tx.GetOutputAmount(1) << endl;
 
