@@ -9,7 +9,7 @@ This project exists to explore and simulate ideas for a [Layer 2](https://en.wik
 * Nodes that relay data for a Sender collect a payment only if the Destination node receives the message data.
 * Payment transactions are verified and settled on a decentralized ledger using online Witness nodes.
 
-![Lot49 Network Overview](./doc/lot49_network_overview.svg?raw=true "Lot49 Network Overview")
+![Lot49 Network Overview](./doc/lot49_network_overview.svg "Lot49 Network Overview")
 
 ## Simulated Radio Specifications
 
@@ -46,7 +46,7 @@ This project exists to explore and simulate ideas for a [Layer 2](https://en.wik
 * Gateways - percent of nodes acting as gateways
 * Witness Channel Setup - confirm new channel setup transactions immediately vs. deferred confirmation
 
-![Lot49 Simulation](./doc/lot49_simulation.svg?raw=true "Lot49 Simulation")
+![Lot49 Simulation](./doc/lot49_simulation.svg "Lot49 Simulation")
 
 ## FAQ
 
