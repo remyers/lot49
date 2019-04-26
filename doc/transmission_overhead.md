@@ -66,13 +66,17 @@ Both the sender and receiver must commit to a new channel state and revoke the p
 
 Unfortunately a Schnorr multisignature can not be used to reduce the overall amount of data transmitted between nodes. Signatures are part of both the commitment_signed and closing_signed messages. However, because nodes update their channel state by transmitting only their own signature, no savings is seen if the initial setup transaction uses a multisignature. Both parties signatures are only combined when a channel is closed cooperatively by signing a partially signed closing transaction or uncooperatively by signing an unrevoked HTLC transaction. 
 
-| Message Type | Simplified Size (bytes) | Total data transmitted by both sender and receiver (bytes), Update three channels, ECDSA or Schnorr | Total data transmitted by both sender and receiver (bytes), Close three channels, ECDSA |
+| Message Type | Simplified Size (bytes) | Total Update* (bytes) ECDSA or Schnorr | Total Close** (bytes) ECDSA |
 | ------------ | --------------- | -------------------------------- | ------------------------------- | 
 | update_add_htlc | 15 | 90 | - |
 | commitment_signed | 129 | 774 | - |
 | revoke_and_ack | 66 | 396 | -
 | closing_signed | 67 | - | 201 |
 | Total: | | 1260 | 201 |
+
+\* Total data transmitted by both sender and receiver to Update three channels
+
+\*\* Total data transmitted by both sender and receiver to Close three channels
 
 ## Lot49 Network
 
