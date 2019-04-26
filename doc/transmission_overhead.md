@@ -23,7 +23,7 @@ We assume all three systems use the following simplifications and optimizations 
 
 ## Lightning Network
 
-The following data structures are used to compute the overhead of simplified versions of the protocol messages described in “[Bolt #2](https://github.com/lightningnetwork/lightning-rfc/blob/master/02-peer-protocol.md) : Peer Protocol For Channel Management.”
+For this analysis, the following data structures are used to compute the overhead of simplified versions of the protocol messages described in “[Bolt #2](https://github.com/lightningnetwork/lightning-rfc/blob/master/02-peer-protocol.md) : Peer Protocol For Channel Management.”
 
 ### update_add_htlc:
 |       | LN Size (bytes) | Simplified Size (bytes) | Note |
@@ -104,7 +104,7 @@ The Lot49 proposal uses the eltoo scheme to update channel states. There is no r
 
 All of the nodes along the relay path collaboratively sign a single transaction (with Schnorr) or set of transactions (BLS). This involves each node modifying the update message to aggregate their signature with the agg_signature field data they received before retransmitting it to the next relay node. To update all three channels requires transmitting the update message three times. 
 
-A Schnorr multisignature or BLS aggregate signature is used to reduce the total amount of data transmitted between nodes. If using Schnorr signatures, each node aggregates their signature to commit to spend from a single setup transaction that must be signed by all of the involved relay nodes. If using BLS signatures, each node aggregates their signature to commit to spend from a setup transaction established with their adjacent relay node.
+A Schnorr multisignature or BLS aggregate signature is used to reduce the total amount of data transmitted between nodes. If using Schnorr signatures, each node aggregates their signature to commit to spend from a single setup transaction that must be signed by all of the involved relay nodes. If using BLS signatures, each node aggregates their signature to commit to spend from a setup transaction established with the next relay node along the route.
 
 For each update, nodes do not need to revoke the previous channel state. This reduces the amount of signature information that must be transmitted. If at any point a relay becomes unresponsive, a single transaction signed with the last complete multisignature (Schnorr) or aggregate signature (BLS) can be committed to settle all of the channels involved.
 
