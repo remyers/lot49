@@ -21,7 +21,7 @@ We assume all three systems use the following simplifications and optimizations 
 * Transactions, including script details and defaults, can be inferred from a 1 byte type ID.
 * The destination node signs a hash of the message to confirm receipt and unlock channel updates between nodes.
 
-## Lightning Network
+## Lightning Protocol
 
 For this analysis, the following data structures are used to compute the overhead of simplified versions of the protocol messages described in “[Bolt #2](https://github.com/lightningnetwork/lightning-rfc/blob/master/02-peer-protocol.md) : Peer Protocol For Channel Management.”
 
@@ -66,7 +66,7 @@ Both the sender and receiver must commit to a new channel state and revoke the p
 
 Unfortunately a Schnorr multisignature can not be used to reduce the overall amount of data transmitted between nodes. Signatures are part of both the commitment_signed and closing_signed messages. However, because nodes update their channel state by transmitting only their own signature, no savings is seen if the initial setup transaction uses a multisignature. Both parties signatures are only combined when a channel is closed cooperatively by signing a partially signed closing transaction or uncooperatively by signing an unrevoked HTLC transaction. 
 
-| Message Type | Simplified Size (bytes) | Total data transmitted by both sender and receiver (bytes), Update three channels, ECDSA or Schnorr | Total data transmitted by both sender and receiver (bytes), Close three channels, ECDSA |
+| Message Type | Simplified Size (bytes) | Total Update* (bytes) ECDSA or Schnorr | Total Close** (bytes) ECDSA |
 | ------------ | --------------- | -------------------------------- | ------------------------------- | 
 | update_add_htlc | 15 | 90 | - |
 | commitment_signed | 129 | 774 | - |
@@ -74,7 +74,11 @@ Unfortunately a Schnorr multisignature can not be used to reduce the overall amo
 | closing_signed | 67 | - | 201 |
 | Total: | | 1260 | 201 |
 
-## Lot49 Network
+\* Total data transmitted by both sender and receiver to Update three channels
+
+\*\* Total data transmitted by both sender and receiver to Close three channels
+
+## Lot49 Protocol
 
 The Lot49 proposal uses the eltoo scheme to update channel states. There is no revocation phase in this update protocol which reduces the amount of data transmitted. It also means that nodes that are part of the same transaction chain can cooperatively sign a single combined transaction to update their respective channel states. In our example the transaction chain includes the transactions that update the three channel states between the message sender and destination node. If an out-of-date update is committed by one of the nodes, it will not result in a penalty and can be replaced by any of the nodes by committing a more recent update within the timelock period. 
 
@@ -120,4 +124,4 @@ For each update, nodes do not need to revoke the previous channel state. This re
 
 ## Conclusion
 
-For an example three hop message delivery, the eltoo revocation system would require transmitting 1/5 as much data to update channels (234 vs 1260 bytes) compared to the current system used by the Lightning Network. Signature aggregation could reduce the amount of data that must be transmitted to an internet gateway to close channels by almost a third (78 vs 201 bytes). The reduction in transmission overhead from using eltoo and signature aggregation increases linearly for longer relay paths.
+For an example three hop message delivery, the eltoo revocation system would require transmitting 1/5 as much data overall to update channels (234 vs 1260 bytes) compared to the Poon-Dryja update scheme used by the Lightning Network. Signature aggregation could reduce the amount of data that must be transmitted to an internet gateway to close channels by almost a third (78 vs 201 bytes). The reduction in transmission overhead from using eltoo and signature aggregation increases proportionally for longer relay paths.
