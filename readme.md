@@ -39,7 +39,7 @@ To reduce the amount of data exchanged between nodes we use a less interactive s
 * Any node can settle the entire chain of payments with a single validly signed incentive header.
 * Public keys are preshared, cached and referenced in routes and incentive headers by a short ID.
 
-![Lot49 Network Overview](./doc/lot49_network_overview.svg?raw=true "Lot49 Network Overview")
+![Lot49 Network Overview](./doc/lot49_network_overview.svg "Lot49 Network Overview")
 
 ## Mesh Radio Network Specifications
 
@@ -76,7 +76,7 @@ To reduce the amount of data exchanged between nodes we use a less interactive s
 * Gateways - percent of nodes acting as gateways
 * Witness Channel Setup - confirm new channel setup transactions immediately vs. deferred confirmation
 
-![Lot49 Simulation](./doc/lot49_simulation.svg?raw=true "Lot49 Simulation")
+![Lot49 Simulation](./doc/lot49_simulation.svg "Lot49 Simulation")
 
 ## FAQ
 
