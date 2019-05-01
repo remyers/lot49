@@ -40,6 +40,7 @@ To reduce the amount of data exchanged between nodes we use a less interactive s
 * Public keys are preshared, cached and referenced in routes and incentive headers by a short ID.
 
 ![Lot49 Network Overview](./doc/lot49_network_overview.svg "Lot49 Network Overview")
+note: Node A is within radio range of Node B, but must relay data to Node D via Nodes B and C.
 
 ## Mesh Radio Network Specifications
 
