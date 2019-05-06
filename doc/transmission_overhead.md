@@ -40,7 +40,7 @@ For this analysis, the following data structures are used to compute the overhea
 ### commitment_signed:
 |       | LN Size (bytes) | Simplified Size (bytes) | Note |
 | ----- | ----                  | ----              | ---- |
-| type | 1 | 1 132 (commitment_signed) |
+| type | 1 | 1 | 132 (commitment_signed) |
 | channel_id | 32 | - | inferred from destination node |
 | signature | 64 | 64 | sign remote commitment (?) | 
 | num_htlcs | 2 | - | assume single htlc signature |
@@ -49,7 +49,7 @@ For this analysis, the following data structures are used to compute the overhea
 ### revoke_and_ack:
 |       | LN Size (bytes) | Simplified Size (bytes) | Note |
 | ----- | ----                  | ----              | ---- |
-| type | 1 | 1 | 132 (commitment_signed) | 
+| type | 1 | 1 | 133 (revoke_and_ack) | 
 | channel_id | 32 | - | inferred from destination node |
 | per_commitment_secret | 32 | 32 | revoke last commitment |
 | next_per_commitment_point | 33 | 33 | new commitment point |
